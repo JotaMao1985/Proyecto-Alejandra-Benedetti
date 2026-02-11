@@ -23,6 +23,11 @@
         rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 
+    <!-- Highlight.js: Syntax highlighting (VS Code dark theme) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+
     <script>
         tailwind.config = {
             theme: {
@@ -124,6 +129,33 @@
         .code-scroll::-webkit-scrollbar-thumb {
             background: linear-gradient(180deg, #3D008D, #ED1E79);
             border-radius: 4px;
+        }
+
+        /* Collapsible code block */
+        details summary::-webkit-details-marker {
+            display: none;
+        }
+
+        details summary::marker {
+            display: none;
+            content: '';
+        }
+
+        details[open] .code-toggle-arrow {
+            transform: rotate(90deg);
+        }
+
+        .code-toggle-arrow {
+            transition: transform 0.2s ease;
+            display: inline-block;
+        }
+
+        /* Highlight.js overrides for seamless dark background */
+        .hljs {
+            background: transparent !important;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
         }
 
         .step-connector::after {
@@ -342,13 +374,7 @@
             <nav class="space-y-2 sticky top-32" id="module-nav">
                 <!-- Nav items injected via JS -->
             </nav>
-            <div class="mt-8 bg-indigo-50 p-4 rounded-lg border border-indigo-100 hidden md:block">
-                <h4 class="font-bold text-primary text-sm mb-2">🎓 Contexto Estadístico</h4>
-                <p class="text-xs text-indigo-700">
-                    Ya no solo analizamos CSVs locales. Ahora nos conectamos a APIs, validamos datos de entrada y
-                    empaquetamos nuestros modelos para producción.
-                </p>
-            </div>
+
         </aside>
 
         <!-- Main Content Area -->
@@ -400,7 +426,7 @@
             modules: [
                 {
                     id: "m1",
-                    title: "Módulo 1: El Protocolo HTTP Expandido",
+                    title: "Módulo 1: El Protocolo HTTP",
                     shortTitle: "HTTP & APIs",
                     objective: "Dominar los verbos, códigos de estado y headers para interactuar robustamente con APIs.",
                     duration: "40 min",
@@ -762,14 +788,14 @@ print("¡Conservó la Fecha y la Tupla exactas!")`,
                     id: "m3",
                     title: "Módulo 3: Validación con Pydantic",
                     shortTitle: "Pydantic",
-                    objective: "Implementar validación estricta de tipos para asegurar la calidad de los datos de entrada.",
-                    duration: "30 min",
+                    objective: "Implementar validación estricta de tipos para asegurar la calidad de los datos de entrada, usando Modelos, Field, Validadores y el patrón de limpieza de DataFrames.",
+                    duration: "40 min",
                     content: {
                         concept: {
-                            title: "El Cadenero de tus Datos",
-                            text: "En programación defensiva antigua, llenábamos el código de `if type(x) != int: raise Error`. Eso es sucio y difícil de leer. Pydantic cambia esto por una <span class='tooltip'>Validación Declarativa<span class='tooltip-text'>Defines QUÉ quieres (el contrato), no CÓMO validarlo paso a paso.</span></span>.<br><br>Pydantic actúa como el <strong>Cadenero (Bouncer)</strong> de tu script. Tú le das las reglas del club (el <span class='tooltip'>Esquema<span class='tooltip-text'>La estructura y tipos esperados de los datos.</span></span>) y él se encarga de revisar a todos en la entrada. Si alguien llega con 'zapatos equivocados' (tipos incorrectos), Pydantic intenta arreglarlos (<span class='tooltip'>Coerción<span class='tooltip-text'>Transformación automática de datos, ej: recibir el texto '5' y convertirlo al número 5.</span></span>). Si no puede, los expulsa con un error detallado.",
+                            title: "El Cadenero de tus Datos: De 'Garbage In' a Datos Confiables",
+                            text: "En estadística existe un dicho famoso: <strong>'Garbage In, Garbage Out'</strong> (entra basura, sale basura). Si alimentas tu modelo con datos corruptos — tipos incorrectos (texto 'veinte' donde va el número 20), valores faltantes inesperados, o datos fuera de rango (una probabilidad de 1.5) — tus conclusiones serán erróneas sin importar qué tan sofisticado sea tu algoritmo.<br><br>Python es de tipado dinámico, genial para prototipar pero peligroso en producción. En la era antigua llenábamos el código de <code>if type(x) != int: raise Error</code>. Pydantic reemplaza esto por una <span class='tooltip'>Validación Declarativa<span class='tooltip-text'>Defines QUÉ quieres (el contrato), no CÓMO validarlo paso a paso.</span></span>: describes QUÉ forma deben tener tus datos y Pydantic se encarga del CÓMO.<br><br>Pydantic actúa como el <strong>Cadenero (Bouncer)</strong> de tu script. Tú le das las reglas del club (el <span class='tooltip'>Esquema<span class='tooltip-text'>La estructura y tipos esperados de los datos.</span></span>) y él se encarga de revisar a todos en la entrada. Si alguien llega con 'zapatos equivocados', Pydantic intenta arreglarlos (<span class='tooltip'>Coerción<span class='tooltip-text'>Transformación automática de datos, ej: recibir el texto '5' y convertirlo al número 5.</span></span>). Pero a diferencia de otras librerías, Pydantic no solo valida: intenta <em>parsear</em> (convertir) los datos al tipo correcto si es posible. Si no puede, los expulsa con un error detallado.<br><br><strong>Conceptos Clave del Módulo:</strong><br>• <strong>BaseModel:</strong> Al heredar de <code>BaseModel</code>, tu clase gana constructor automático (sin escribir <code>__init__</code>), serialización (<code>.model_dump()</code>), y protección de tipos en tiempo de ejecución.<br>• <strong>Field:</strong> Restricciones numéricas declarativas (<code>gt</code>, <code>le</code>, <code>ge</code>) y <code>description</code> para documentación automática.<br>• <strong>Campos Opcionales:</strong> <code>Optional[float] = None</code> permite manejar datos faltantes (<em>NaN</em>) explícitamente — vital en estadística para no sesgar promedios con ceros falsos.<br>• <strong>@field_validator:</strong> Limpieza (<code>mode='before'</code>) para datos sucios (ej. coma decimal '12,5') y reglas de negocio (<code>mode='after'</code>) para lógica que Pydantic no conoce.<br>• <strong>Validación de DataFrames:</strong> Patrón fila-por-fila con <code>try/except</code> para separar registros buenos de erróneos sin detener el proceso.",
                             analogy: "🛡️ <strong>Analogía:</strong><br>• <strong>Validación Manual:</strong> Es como un guardia que tiene que revisar cada bolsillo manualmente y preguntar '¿Eres mayor de edad?'. Lento y propenso a errores.<br>• <strong>Pydantic:</strong> Es un escáner biométrico de aeropuerto. Pasas (los datos), y automáticamente verifica identidad, pasaporte y equipaje en milisegundos. Si algo falla, te dice exactamente qué (ej: 'Pasaporte vencido').",
-                            warning: "💡 <strong>Tip Moderno:</strong> Pydantic V2 está escrito en Rust, lo que lo hace extremadamente rápido. Úsalo para validar filas de DataFrames, respuestas de APIs o configuraciones complejas."
+                            warning: "💡 <strong>Tip Moderno:</strong> Pydantic V2 está escrito en Rust, lo que lo hace extremadamente rápido. Úsalo para validar filas de DataFrames, respuestas de APIs o configuraciones complejas. Instálalo con: <code>pip install pydantic</code>"
                         },
                         comparison: [
                             {
@@ -780,63 +806,115 @@ print("¡Conservó la Fecha y la Tupla exactas!")`,
                             },
                             {
                                 title: "Pydantic 🛡️",
-                                pros: ["Declarativo (Legible)", "Coerción automática (Str -> Int)", "Mensajes de error estandarizados"],
+                                pros: ["Declarativo (Legible)", "Coerción automática (Str -> Int)", "Mensajes de error estandarizados", "Serialización (.model_dump())"],
                                 cons: ["Requiere instalar librería", "Curva de aprendizaje inicial"],
                                 bestFor: "APIs (FastAPI), Pipelines de Datos, Configuración"
                             }
                         ],
                         code: {
-                            title: "Definiendo un Contrato de Datos",
+                            title: "Contrato de Datos Completo: Field, Optional, Validadores y DataFrames",
                             language: "python",
                             snippet: `from pydantic import BaseModel, Field, field_validator, ValidationError
-from typing import Optional
+from typing import Optional, List
+import pandas as pd
 
-# 1. Definir el Esquema (El Contrato)
-class Producto(BaseModel):
-    id: int
-    nombre: str = Field(min_length=3)    # Mínimo 3 caracteres
-    precio: float = Field(gt=0)          # Greater Than 0
+# ══════════════════════════════════════════════════
+# 1. MODELO CON FIELD, OPTIONAL Y VALIDADOR
+# ══════════════════════════════════════════════════
+
+class VariableEstadistica(BaseModel):
+    # Campo obligatorio con restricción de longitud
+    nombre: str = Field(..., min_length=2, description="Nombre de la variable")
+
+    # Restricción numérica: gt = mayor que 0 (la desviación no puede ser negativa)
+    desviacion_std: float = Field(..., gt=0, description="Desviación estándar positiva")
+
+    # Restricción de rango: ge=0, le=1 (probabilidad entre 0 y 1)
+    probabilidad: float = Field(..., ge=0, le=1, description="Probabilidad [0,1]")
+
+    # Campo NULLABLE (puede ser None) → Dato faltante en estadística
+    # Diferencia clave: None (no medido) vs 0 (medido con valor cero)
+    n_muestras: Optional[int] = Field(default=None, ge=1)
+
+    # Campo con valor por defecto
+    activa: bool = True
+
+    # VALIDADOR mode='before': Limpieza de datos sucios
+    # Se ejecuta ANTES de verificar el tipo → Ideal para arreglar formatos
+    @field_validator('desviacion_std', mode='before')
+    @classmethod
+    def corregir_coma_decimal(cls, v):
+        if isinstance(v, str):
+            return float(v.replace(',', '.'))  # "2,5" → 2.5
+        return v
+
+    # VALIDADOR mode='after': Regla de negocio (post-tipado)
+    @field_validator('nombre')
+    @classmethod
+    def normalizar_nombre(cls, v: str) -> str:
+        return v.strip().lower()  # "  Edad  " → "edad"
+
+# --- Prueba del Modelo ---
+try:
+    v1 = VariableEstadistica(
+        nombre="  Peso  ", desviacion_std="12,5",  # Coma decimal (dato sucio)
+        probabilidad=0.95, n_muestras=None          # Dato faltante explícito
+    )
+    print(f"✅ Modelo: {v1}")
+    print(f"📦 Dict:  {v1.model_dump()}")
+except ValidationError as e:
+    print(f"❌ ERROR: {e}")
+
+# ══════════════════════════════════════════════════
+# 2. VALIDACIÓN DE DATAFRAME (PANDAS)
+# ══════════════════════════════════════════════════
+
+class Transaccion(BaseModel):
+    id_tx: int
+    monto: float = Field(gt=0)
     categoria: str
 
-    # 2. Validador Personalizado (Lógica de Negocio)
-    @field_validator('categoria')
-    @classmethod
-    def categoria_mayuscula(cls, v: str) -> str:
-        if v.upper() not in ['TECH', 'HOGAR', 'MODA']:
-            raise ValueError('Categoría inválida. Debe ser TECH, HOGAR o MODA')
-        return v.upper() # Coerción forzada a mayúsculas
+df = pd.DataFrame([
+    {"id_tx": 1,   "monto": 100.50, "categoria": "comida"},     # ✅ OK
+    {"id_tx": "2", "monto": 200,    "categoria": "transporte"}, # ✅ Coerción str→int
+    {"id_tx": 3,   "monto": "abc",  "categoria": "ocio"},       # ❌ Monto inválido
+])
 
-# Datos "Sucios" de entrada (Diccionario)
-datos_entrada = {
-    "id": "550",          # String -> Pydantic lo hará Int
-    "nombre": "TV",       # ❌ Error: Muy corto (min 3)
-    "precio": -100,       # ❌ Error: Negativo (gt 0)
-    "categoria": "tech"   # Minúscula -> El validador lo hará "TECH"
-}
+limpios, errores = [], []
+for i, fila in df.iterrows():
+    try:
+        dato = Transaccion(**fila.to_dict())
+        limpios.append(dato.model_dump())
+    except ValidationError as e:
+        errores.append({"fila": i, "error": str(e)})
 
-try:
-    # 3. Validar
-    prod = Producto(**datos_entrada)
-    print(f"✅ Producto creado: {prod}")
-except ValidationError as e:
-    print("❌ DATOS RECHAZADOS:")
-    print(e.json(indent=2))`,
-                            output: "❌ DATOS RECHAZADOS:\\n[\\n  {\\n    \"type\": \"string_too_short\",\\n    \"loc\": [\"nombre\"],\\n    \"msg\": \"String should have at least 3 characters\",\\n    \"input\": \"TV\",\\n    \"ctx\": {\"min_length\": 3}\\n  },\\n  {\\n    \"type\": \"greater_than\",\\n    \"loc\": [\"precio\"],\\n    \"msg\": \"Input should be greater than 0\",\\n    \"input\": -100,\\n    \"ctx\": {\"gt\": 0}\\n  }\\n]"
+print(f"\\n📊 Válidos: {len(limpios)} | Fallidos: {len(errores)}")
+df_final = pd.DataFrame(limpios)
+print(df_final)`,
+                            output: "✅ Modelo: nombre='peso' desviacion_std=12.5 probabilidad=0.95 n_muestras=None activa=True\\n📦 Dict: {'nombre': 'peso', 'desviacion_std': 12.5, 'probabilidad': 0.95, 'n_muestras': None, 'activa': True}\\n\\n📊 Válidos: 2 | Fallidos: 1\\n   id_tx   monto   categoria\\n0      1  100.50      comida\\n1      2  200.00  transporte"
                         },
                         codeExplanation: {
-                            title: "🔍 Análisis del Modelo",
+                            title: "🔍 Análisis del Modelo Completo",
                             steps: [
                                 {
-                                    title: "1. BaseModel",
-                                    text: "Al heredar de `BaseModel`, nuestra clase `Producto` gana superpoderes de validación. Ya no es una clase normal, es un Esquema."
+                                    title: "1. BaseModel (El Núcleo)",
+                                    text: "Al heredar de <code>BaseModel</code>, la clase <code>VariableEstadistica</code> gana superpoderes automáticos: constructor sin escribir <code>__init__</code>, serialización con <code>.model_dump()</code> (ideal para exportar a dicts/JSON/Pandas), y protección de tipos en tiempo de ejecución."
                                 },
                                 {
-                                    title: "2. Constraints (Restricciones)",
-                                    text: "Usamos `Field(gt=0)` para decir 'El precio debe ser mayor a 0'. Pydantic valida esto automáticamente sin escribir ni un solo `if`."
+                                    title: "2. Field (Restricciones Declarativas)",
+                                    text: "Usamos <code>Field(gt=0)</code> para 'mayor que 0', <code>Field(ge=0, le=1)</code> para 'entre 0 y 1', y <code>description</code> para documentar qué significa cada variable. Cuando usas <code>Field(...)</code> (tres puntos), el campo es <strong>requerido</strong>. Esto reemplaza docenas de líneas de <code>if/else</code>."
                                 },
                                 {
-                                    title: "3. Validadores Custom (@field_validator)",
-                                    text: "Para reglas complejas (como verificar una lista de categorías válidas), usamos decoradores. Aquí también transformamos 'tech' a 'TECH' automáticamente."
+                                    title: "3. Campos Opcionales y Nulos",
+                                    text: "<code>Optional[int] = None</code> permite que un valor sea nulo explícitamente (<em>dato faltante</em>). <strong>Nota estadística:</strong> diferenciar entre <code>0</code> (valor observado) y <code>None</code> (dato perdido) es vital para no sesgar promedios. Si un paciente no reporta cuántos cigarrillos fuma y ponemos 0, bajamos el promedio falsamente."
+                                },
+                                {
+                                    title: "4. Validadores @field_validator",
+                                    text: "<strong>mode='before':</strong> Limpieza de datos sucios. Se ejecuta ANTES de la validación de tipo, ideal para corregir formatos (coma decimal '12,5' → 12.5). <strong>mode='after':</strong> Reglas post-tipado como normalizar texto a minúsculas. Ambos usan <code>@classmethod</code> porque no necesitan instancia creada."
+                                },
+                                {
+                                    title: "5. Patrón de Validación de DataFrames",
+                                    text: "La integración con Pandas usa un bucle <code>for fila in df.iterrows()</code> con <code>try/except</code>. Cada fila se valida individualmente: las buenas van a <code>limpios</code>, las malas a <code>errores</code> con detalle de qué falló. Así no se detiene el pipeline por una fila corrupta."
                                 }
                             ]
                         },
@@ -850,18 +928,18 @@ except ValidationError as e:
                                     "Borra el dato."
                                 ],
                                 correct: 1,
-                                feedback: "✅ Correcto. Pydantic es inteligente e intenta 'coaccionar' los tipos si tiene sentido. Esto facilita manejar inputs de formularios web o JSONs."
+                                feedback: "✅ Correcto. Pydantic intenta 'coaccionar' (convertir) los tipos. Como '50' es un string numérico válido, lo transforma automáticamente a entero."
                             },
                             {
-                                question: "2. ¿Para qué sirve `Field(gt=0)` en la definición del modelo?",
+                                question: "2. ¿Para qué sirve `Field(gt=0, le=1, description='...')` en la definición del modelo?",
                                 options: [
                                     "Para definir un valor por defecto de 0.",
                                     "Para decir que el campo es opcional.",
-                                    "Para imponer una restricción: el valor debe ser mayor a 0 (Greater Than).",
+                                    "Para imponer restricciones numéricas (rango) y añadir documentación al campo.",
                                     "No hace nada, es comentario."
                                 ],
                                 correct: 2,
-                                feedback: "✅ Exacto. `Field` nos permite añadir metadatos y validaciones numéricas o de longitud de forma declarativa."
+                                feedback: "✅ Exacto. Field combina restricciones de validación (gt, le, ge, min_length) con documentación (description), todo de forma declarativa."
                             },
                             {
                                 question: "3. ¿Por qué preferimos Pydantic sobre escribir muchos `if/else`?",
@@ -873,22 +951,71 @@ except ValidationError as e:
                                 ],
                                 correct: 1,
                                 feedback: "✅ Correcto. La legibilidad y la estandarización son claves. Además, Pydantic genera documentación automática (OpenAPI) en frameworks como FastAPI."
+                            },
+                            {
+                                question: "4. En estadística, ¿por qué preferimos `int | None = None` sobre `int = 0` para datos faltantes?",
+                                options: [
+                                    "Porque None ocupa menos memoria.",
+                                    "Porque 0 es un valor numérico real y puede sesgar el promedio si el dato en realidad faltaba.",
+                                    "Porque Python prefiere None.",
+                                    "No hay diferencia."
+                                ],
+                                correct: 1,
+                                feedback: "✅ Crucial. Si un paciente no responde cuántos cigarrillos fuma y ponemos 0, bajamos el promedio falsamente. Con None, podemos excluirlo del cálculo."
+                            },
+                            {
+                                question: "5. ¿Cuál es la utilidad de `@field_validator(..., mode='before')`?",
+                                options: [
+                                    "Validar datos después de crearlos.",
+                                    "Limpiar o transformar datos crudos antes de que Pydantic verifique su tipo.",
+                                    "Hacer que la validación sea más rápida.",
+                                    "Ignorar los errores de validación."
+                                ],
+                                correct: 1,
+                                feedback: "✅ Correcto. Es ideal para 'Data Cleaning': convertir formatos extraños (ej. coma decimal '1,5') a tipos nativos antes de que Pydantic lance un error."
+                            },
+                            {
+                                question: "6. ¿Cuál es la mejor estrategia para validar un DataFrame de Pandas con Pydantic?",
+                                options: [
+                                    "Convertir todo el DataFrame a un solo objeto Pydantic.",
+                                    "No se puede usar Pydantic con Pandas.",
+                                    "Iterar sobre las filas, validar cada una con try/except y separar válidos de errores.",
+                                    "Usar Pandas para validar tipos."
+                                ],
+                                correct: 2,
+                                feedback: "✅ Exacto. Iterar permite capturar errores fila por fila sin detener todo el proceso, creando un pipeline de datos robusto."
                             }
                         ],
                         glossary: {
-                            title: "🗂️ Glosario: Validación",
+                            title: "🗂️ Glosario: Validación con Pydantic",
                             items: [
                                 {
                                     term: "Esquema (Schema)",
                                     definition: "La definición formal de la estructura de tus datos. Qué campos existen y qué tipos tienen."
                                 },
                                 {
+                                    term: "BaseModel",
+                                    definition: "Clase base de Pydantic. Al heredar de ella, tu clase gana constructor automático, serialización (<code>.model_dump()</code>), y validación de tipos sin escribir código extra."
+                                },
+                                {
                                     term: "Type Hinting",
-                                    definition: "Sintaxis de Python (`x: int`) para indicar el tipo de dato esperado. Pydantic usa esto para saber cómo validar."
+                                    definition: "Sintaxis de Python (<code>x: int</code>) para indicar el tipo de dato esperado. Pydantic usa esto para saber cómo validar."
                                 },
                                 {
                                     term: "Coerción",
                                     definition: "La conversión automática y forzada de un tipo de dato a otro (ej. String -> Integer) para cumplir con el esquema."
+                                },
+                                {
+                                    term: "Field",
+                                    definition: "Función de Pydantic para añadir restricciones (<code>gt</code>, <code>le</code>, <code>min_length</code>) y metadatos (<code>description</code>) a cada campo de un modelo."
+                                },
+                                {
+                                    term: "Optional / Nullable",
+                                    definition: "<code>Optional[float] = None</code> o <code>float | None = None</code>. Permite que un campo sea explícitamente nulo, crucial para representar datos faltantes en estadística."
+                                },
+                                {
+                                    term: "@field_validator",
+                                    definition: "Decorador para lógica personalizada. <code>mode='before'</code> limpia datos antes de la validación de tipo; <code>mode='after'</code> aplica reglas de negocio post-tipado."
                                 },
                                 {
                                     term: "Declarativo",
@@ -1321,18 +1448,23 @@ echo "✅ Proyecto listo para trabajar"`,
 
             contentHTML += `</section>`;
 
-            // Code Section
+            // Code Section (collapsible + syntax highlighting)
             if (mod.content.code) {
                 contentHTML += `
                     <section class="bg-gray-900 rounded-xl overflow-hidden shadow-lg border border-gray-700">
-                        <div class="bg-gray-800 px-4 py-2 flex items-center justify-between border-b border-gray-700">
-                            <span class="text-gray-300 text-xs font-mono">main.py</span>
-                            <span class="text-xs text-gray-500">Python 3.11</span>
-                        </div>
-                        <div class="p-6 overflow-x-auto code-scroll">
-                            <h4 class="text-gray-400 text-sm font-bold mb-3 border-b border-gray-700 pb-2">${mod.content.code.title}</h4>
-                            <pre class="code-font text-sm text-gray-300 whitespace-pre"><code id="code-block">${escapeHtml(mod.content.code.snippet)}</code></pre>
-                        </div>
+                        <details open>
+                            <summary class="bg-gray-800 px-4 py-2 flex items-center justify-between border-b border-gray-700 cursor-pointer select-none list-none hover:bg-gray-750 transition-colors">
+                                <div class="flex items-center gap-2">
+                                    <span class="code-toggle-arrow text-gray-400 text-xs transition-transform">▶</span>
+                                    <span class="text-gray-300 text-xs font-mono">main.py</span>
+                                    <span class="text-xs text-gray-500 ml-2">${mod.content.code.title}</span>
+                                </div>
+                                <span class="text-xs text-gray-500">Python 3.11</span>
+                            </summary>
+                            <div class="p-6 overflow-x-auto code-scroll">
+                                <pre class="!m-0 !p-0 !bg-transparent"><code id="code-block" class="language-python hljs">${escapeHtml(mod.content.code.snippet)}</code></pre>
+                            </div>
+                        </details>
                         <div class="bg-black bg-opacity-50 p-4 border-t border-gray-800 flex items-center justify-between">
                             <button onclick="runSimulation('${mod.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2 transition-colors">
                                 <span>▶ Ejecutar Código</span>
@@ -1503,6 +1635,12 @@ echo "✅ Proyecto listo para trabajar"`,
 
             contentHTML += `</div>`; // Close fade-in wrapper
             contentArea.innerHTML = contentHTML;
+
+            // Apply syntax highlighting
+            const codeEl = document.getElementById('code-block');
+            if (codeEl && typeof hljs !== 'undefined') {
+                hljs.highlightElement(codeEl);
+            }
 
             // Initialize Chart if needed
             if (mod.content.chartData) {

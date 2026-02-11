@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python POO para Estadística — USTA</title>
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+    <!-- Babel para JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Google Fonts: Montserrat y Fira Code -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Montserrat', 'Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#3D008D',
+                        secondary: '#ED1E79',
+                        navy: '#001A4D',
+                        gold: '#FDB913',
+                        bg: '#F8FAFC',
+                        surface: '#FFFFFF',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: #F8FAFC;
+            color: #1E293B;
+            scroll-behavior: smooth;
+        }
+
+        code,
+        pre {
+            font-family: 'Fira Code', monospace;
+        }
+
+        /* USTA Gradient Background */
+        .usta-gradient {
+            background: linear-gradient(140deg, #3D008D 0%, #ED1E79 100%);
+        }
+
+        /* USTA Navy Header */
+        .usta-header {
+            background: linear-gradient(180deg, #001A4D 0%, #002868 100%);
+        }
+
+        /* USTA Card Style */
+        .usta-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+        }
+
+        .usta-card:hover {
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12);
+            transform: translateY(-4px);
+        }
+
+        /* Tip box USTA style */
+        .tip-box {
+            background: linear-gradient(135deg, rgba(61, 0, 141, 0.08) 0%, rgba(237, 30, 121, 0.08) 100%);
+            border: 1px solid rgba(61, 0, 141, 0.2);
+        }
+
+        /* Sidebar active state */
+        .nav-item.active {
+            background: linear-gradient(90deg, rgba(61, 0, 141, 0.15) 0%, transparent 100%);
+            border-left: 4px solid #ED1E79;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #3D008D, #ED1E79);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #4A00A8, #FF2D8A);
+        }
+
+        /* Code scrollbar */
+        .code-scroll::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .code-scroll::-webkit-scrollbar-track {
+            background: #2d2d2d;
+        }
+
+        .code-scroll::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #3D008D, #ED1E79);
+            border-radius: 4px;
+        }
+
+        /* Fade-in animation */
+        .animate-fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Focus styles for accessibility */
+        button:focus-visible {
+            outline: 2px solid #ED1E79;
+            outline-offset: 2px;
+        }
+
+        /* Syntax highlighting */
+        .syntax-kwd {
+            color: #c678dd;
+            font-weight: bold;
+        }
+
+        .syntax-cls {
+            color: #e5c07b;
+        }
+
+        .syntax-str {
+            color: #98c379;
+        }
+
+        .syntax-com {
+            color: #5c6370;
+            font-style: italic;
+        }
+
+        .syntax-func {
+            color: #61afef;
+        }
+
+        .syntax-self {
+            color: #e06c75;
+            font-style: italic;
+        }
+
+        .syntax-num {
+            color: #d19a66;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- Definición de Iconos (SVG Inline para evitar errores de librerías externas) ---
+        const Icons = {
+            BookOpen: ({ size = 24, className = "" }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                </svg>
+            ),
+            Box: ({ size = 24, className = "" }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+            ),
+            Activity: ({ size = 24, className = "" }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+            ),
+            GitBranch: ({ size = 24, className = "" }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    <line x1="6" y1="3" x2="6" y2="15"></line>
+                    <circle cx="18" cy="6" r="3"></circle>
+                    <circle cx="6" cy="18" r="3"></circle>
+                    <path d="M18 9a9 9 0 0 1-9 9"></path>
+                </svg>
+            ),
+            Terminal: ({ size = 24, className = "" }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    <polyline points="4 17 10 11 4 5"></polyline>
+                    <line x1="12" y1="19" x2="20" y2="19"></line>
+                </svg>
+            ),
+            ChevronLeft: ({ size = 24, className = "" }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+            ),
+            ChevronRight: ({ size = 24, className = "" }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+            )
+        };
+
+        // --- Componentes de UI ---
+
+        const CodeBlock = ({ code }) => {
+            const [isOpen, setIsOpen] = useState(false);
+
+            const formatCode = (str) => {
+                let formatted = str
+                    .replace(/import /g, '<span class="syntax-kwd">import </span>')
+                    .replace(/class /g, '<span class="syntax-kwd">class </span>')
+                    .replace(/def /g, '<span class="syntax-kwd">def </span>')
+                    .replace(/return /g, '<span class="syntax-kwd">return </span>')
+                    .replace(/self/g, '<span class="syntax-self">self</span>')
+                    .replace(/__init__/g, '<span class="syntax-func">__init__</span>')
+                    .replace(/#/g, '<span class="syntax-com">#');
+
+                return { __html: formatted };
+            };
+
+            const lineCount = code.trim().split('\n').length;
+
+            return (
+                <div className="my-4 rounded-xl overflow-hidden border border-gray-700 shadow-lg">
+                    <button
+                        onClick={() => setIsOpen(prev => !prev)}
+                        className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-300 hover:text-white transition-colors"
+                        style={{ background: '#1e1e2e' }}
+                    >
+                        <span className="flex items-center gap-2">
+                            <i className="fas fa-code text-secondary"></i>
+                            <span>Código Python</span>
+                            <span className="text-xs text-gray-500 font-normal">({lineCount} líneas)</span>
+                        </span>
+                        <i className={`fas fa-chevron-down text-xs transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}></i>
+                    </button>
+                    <div
+                        style={{
+                            maxHeight: isOpen ? '2000px' : '0',
+                            opacity: isOpen ? 1 : 0,
+                            transition: 'max-height 0.4s ease, opacity 0.3s ease',
+                            overflow: 'hidden'
+                        }}
+                    >
+                        <div className="bg-gray-900 text-gray-100 p-4 overflow-x-auto code-scroll text-sm leading-relaxed">
+                            <pre dangerouslySetInnerHTML={formatCode(code)} />
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const SectionHeader = ({ title, icon: Icon }) => (
+            <div className="flex items-center gap-3 mb-4 border-b border-gray-200 pb-3">
+                <div className="usta-gradient p-2.5 rounded-xl shadow-md text-white">
+                    {Icon && <Icon size={24} />}
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
+            </div>
+        );
+
+        // --- Lógica del Curso (Data) ---
+
+        const curriculum = [
+            {
+                id: 'intro',
+                title: 'Introducción: El Concepto',
+                icon: 'BookOpen',
+                content: (
+                    <div>
+                        <p className="mb-4">
+                            La Programación Orientada a Objetos (POO) trata de agrupar datos y funciones en una sola entidad.
+                            Para entenderlo fácilmente, pensemos en algo cotidiano: <strong>Una Moneda</strong>.
+                        </p>
+                        <p className="mb-4">
+                            Si quisiéramos representar una moneda en código, necesitamos definir dos cosas:
+                        </p>
+                        <ul className="list-disc pl-5 space-y-2 mb-4 text-sm">
+                            <li><strong>Estado (Atributos):</strong> ¿Qué <em>es</em> o qué <em>tiene</em>? En este caso, tiene una cara visible (Cara o Cruz).</li>
+                            <li><strong>Comportamiento (Métodos):</strong> ¿Qué puede <em>hacer</em>? Puede ser lanzada al aire (cambiar su estado aleatoriamente).</li>
+                        </ul>
+                        <p className="mb-4">
+                            El siguiente código define la "Idea" (Clase) de una moneda. Cuando decimos <code>Coin()</code>, creamos una moneda real (Objeto) que podemos usar.
+                        </p>
+                        <div className="tip-box p-4 rounded-lg text-sm mt-4 text-gray-800">
+                            <strong className="text-primary">Próximos pasos:</strong> En este curso aplicaremos esta misma lógica para crear un <strong>Analizador Estadístico</strong>. Su "Estado" serán los datos numéricos y su "Comportamiento" serán los cálculos matemáticos.
+                        </div>
+                    </div>
+                ),
+                pythonCode: `import random
+
+class Coin:
+    def __init__(self):
+        # El Constructor: Define el estado inicial
+        # self.sideup es el atributo que guarda "Cara" o "Cruz"
+        self.sideup = "Heads"
+
+    def toss(self):
+        # Un Método: Una acción que cambia el estado
+        if random.randint(0, 1) == 0:
+            self.sideup = "Heads"
+        else:
+            self.sideup = "Tails"
+
+    def get_sideup(self):
+        # Un Método: Una acción para ver el estado
+        return self.sideup
+
+# Crear un objeto (Instanciar)
+mi_moneda = Coin()
+mi_moneda.toss()
+print(mi_moneda.get_sideup())`,
+                interactiveType: 'concept'
+            },
+            {
+                id: 'class_obj',
+                title: 'Clases y el Constructor',
+                icon: 'Box',
+                content: (
+                    <div>
+                        <p className="mb-4">
+                            Ahora aplicaremos lo aprendido con la moneda a nuestro proyecto: el <code>AnalizadorDatos</code>.
+                        </p>
+                        <p className="mb-4">
+                            Al igual que la moneda iniciaba en "Heads", nuestro analizador necesita iniciar con datos. Usamos el método <code>__init__</code> para esto.
+                        </p>
+                        <ul className="list-disc pl-5 space-y-2 mb-4">
+                            <li><strong>class:</strong> La plantilla para crear objetos.</li>
+                            <li><strong>__init__:</strong> El método que se ejecuta automáticamente al crear el objeto.</li>
+                            <li><strong>self:</strong> Es como el objeto diciéndose "mí mismo". <code>self.datos</code> significa "mis propios datos".</li>
+                        </ul>
+                    </div>
+                ),
+                pythonCode: `class AnalizadorDatos:
+    def __init__(self, lista_numeros):
+        # Guardamos la lista dentro del objeto
+        # como un 'atributo'
+        self.datos = lista_numeros
+        self.n = len(lista_numeros)
+        print(f"Analizador iniciado con {self.n} datos")
+
+# Crear (Instanciar) el objeto
+mi_estudio = AnalizadorDatos([5, 8, 12, 3])
+# Ahora 'mi_estudio' tiene sus propios datos guardados`,
+                interactiveType: 'instantiation'
+            },
+            {
+                id: 'class_components',
+                title: 'Componentes: Atributos de Clase',
+                icon: 'Box',
+                content: (
+                    <div>
+                        <p className="mb-4">
+                            Hasta ahora hemos visto atributos que pertenecen a cada objeto (usando <code>self</code>). Pero, ¿qué pasa si queremos un valor compartido por <strong>todos</strong> los analizadores?
+                        </p>
+                        <p className="mb-4">
+                            Aquí entran los <strong>Componentes de Clase</strong>:
+                        </p>
+                        <ul className="list-disc pl-5 space-y-2 mb-4">
+                            <li><strong>Atributos de Instancia:</strong> Se definen en <code>__init__</code>. Son únicos para cada objeto (ej. tus datos).</li>
+                            <li><strong>Atributos de Clase:</strong> Se definen fuera de los métodos. Son compartidos por todas las instancias (ej. una configuración global).</li>
+                        </ul>
+                    </div>
+                ),
+                pythonCode: `class AnalizadorDatos:
+    # Atributo de Clase (Compartido por todos)
+    # Ej: Nivel de confianza por defecto (95%)
+    confianza = 0.95
+
+    def __init__(self, datos):
+        # Atributo de Instancia (Único para este objeto)
+        self.datos = datos
+
+estudio1 = AnalizadorDatos([1, 2, 3])
+estudio2 = AnalizadorDatos([8, 9, 10])
+
+# Ambos comparten la misma confianza
+print(estudio1.confianza) # 0.95
+print(estudio2.confianza) # 0.95`,
+                interactiveType: 'class_components'
+            },
+            {
+                id: 'methods',
+                title: 'Métodos: Dando vida al objeto',
+                icon: 'Activity',
+                content: (
+                    <div>
+                        <p className="mb-4">
+                            Ahora que nuestro objeto tiene datos (atributos), necesita hacer cosas. Las funciones dentro de una clase se llaman <strong>Métodos</strong>.
+                        </p>
+                        <p className="mb-4">
+                            Vamos a añadir métodos para calcular medidas de tendencia central. Observa cómo los métodos usan <code>self.datos</code> para acceder a la información que guardamos en el <code>__init__</code>. No necesitamos pasar la lista como argumento cada vez.
+                        </p>
+                    </div>
+                ),
+                pythonCode: `class AnalizadorDatos:
+    def __init__(self, datos):
+        self.datos = datos
+
+    def media(self):
+        # self.datos es accesible aquí
+        return sum(self.datos) / len(self.datos)
+
+    def mediana(self):
+        sorted_data = sorted(self.datos)
+        n = len(sorted_data)
+        mid = n // 2
+        
+        if n % 2 == 0:
+            return (sorted_data[mid-1] + sorted_data[mid]) / 2
+        else:
+            return sorted_data[mid]`,
+                interactiveType: 'methods'
+            },
+            {
+                id: 'inheritance',
+                title: 'Herencia y Polimorfismo',
+                icon: 'GitBranch',
+                content: (
+                    <div>
+                        <p className="mb-4">
+                            Aquí es donde la POO brilla en Estadística. Imagina que quieres calcular la <strong>Varianza</strong>.
+                        </p>
+                        <p className="mb-4 text-sm text-gray-600">
+                            Recordatorio matemático:
+                            <br />- Varianza Poblacional divide por <strong>N</strong>.
+                            <br />- Varianza Muestral divide por <strong>N - 1</strong> (Corrección de Bessel).
+                        </p>
+                        <p className="mb-4">
+                            En lugar de escribir una función gigante con <code>if tipo == 'poblacion'</code>, usamos <strong>Herencia</strong>.
+                            Creamos una clase base genérica y dos clases hijas que modifican (sobreescriben) el comportamiento específico.
+                        </p>
+
+                        <div className="usta-card p-5 mt-6 mb-4">
+                            <h4 className="font-bold text-lg text-primary mb-3 flex items-center gap-2">
+                                <i className="fas fa-sitemap"></i> ¿Qué es la Herencia?
+                            </h4>
+                            <p className="text-sm mb-3">
+                                La <strong>Herencia</strong> es un mecanismo de la POO que permite crear una nueva clase (<em>clase hija</em>) a partir de una clase existente (<em>clase padre</em>). La clase hija <strong>hereda todos los atributos y métodos</strong> de la clase padre, y puede agregar nuevos o modificar los existentes.
+                            </p>
+                            <p className="text-sm mb-3">
+                                En nuestro ejemplo estadístico:
+                            </p>
+                            <ul className="list-disc pl-5 space-y-2 text-sm mb-3">
+                                <li><code>EstadisticaBase</code> es la <strong>clase padre</strong>. Define lo que todas las estadísticas comparten: recibir datos y calcular la media (<code>self.mu</code>).</li>
+                                <li><code>Poblacion</code> y <code>Muestra</code> son <strong>clases hijas</strong>. Heredan automáticamente el constructor <code>__init__</code> y el atributo <code>self.mu</code> sin necesidad de reescribirlos.</li>
+                            </ul>
+                            <p className="text-sm text-gray-600 italic">
+                                La ventaja es clara: si mañana necesitas agregar un método <code>rango()</code>, lo escribes una sola vez en <code>EstadisticaBase</code> y tanto <code>Poblacion</code> como <code>Muestra</code> lo tendrán disponible.
+                            </p>
+                        </div>
+
+                        <div className="usta-card p-5 mb-4">
+                            <h4 className="font-bold text-lg text-secondary mb-3 flex items-center gap-2">
+                                <i className="fas fa-exchange-alt"></i> ¿Qué es el Polimorfismo?
+                            </h4>
+                            <p className="text-sm mb-3">
+                                <strong>Polimorfismo</strong> (del griego: «muchas formas») significa que un mismo método puede comportarse de manera diferente según el objeto que lo ejecute. Cada clase hija <strong>sobreescribe</strong> (<em>override</em>) el método de la clase padre con su propia implementación.
+                            </p>
+                            <p className="text-sm mb-3">
+                                En nuestro caso, el método <code>.varianza()</code> existe en ambas clases hijas, pero cada una lo calcula distinto:
+                            </p>
+                            <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                                <div className="tip-box rounded-lg p-3">
+                                    <div className="font-bold text-primary text-xs uppercase mb-1">Poblacion.varianza()</div>
+                                    <div>Divide por <strong>N</strong> (total de datos)</div>
+                                </div>
+                                <div className="bg-white rounded-lg p-3 border border-gray-200 shadow-sm">
+                                    <div className="font-bold text-secondary text-xs uppercase mb-1">Muestra.varianza()</div>
+                                    <div>Divide por <strong>N − 1</strong> (corrección de Bessel)</div>
+                                </div>
+                            </div>
+                            <p className="text-sm text-gray-600 italic">
+                                Gracias al polimorfismo puedes escribir una función como <code>def reporte(obj): print(obj.varianza())</code> y pasarle cualquier objeto — sea <code>Poblacion</code> o <code>Muestra</code> — y producirá el resultado correcto sin necesidad de preguntar de qué tipo es.
+                            </p>
+                        </div>
+
+                        <div className="tip-box p-4 rounded-lg mt-6 text-gray-800">
+                            <h4 className="font-bold text-primary mb-3 flex items-center gap-2">
+                                <i className="fas fa-lightbulb text-gold"></i> Instrucciones de Uso
+                            </h4>
+                            <ol className="list-decimal pl-5 space-y-2 text-sm mb-4">
+                                <li>
+                                    <strong>Instanciar la subclase correcta:</strong> Usa <code>Poblacion(datos)</code> cuando tengas <em>todos</em> los datos del universo. Usa <code>Muestra(datos)</code> cuando trabajes con un subconjunto representativo.
+                                </li>
+                                <li>
+                                    <strong>Llamar a <code>.varianza()</code>:</strong> El mismo método retorna el cálculo apropiado según la clase elegida (÷ N o ÷ N−1). Ejemplo:
+                                    <br /><code>p = Poblacion([10, 15, 12, 18, 20])</code>
+                                    <br /><code>print(p.varianza())</code>
+                                </li>
+                                <li>
+                                    <strong>Acceder a la media:</strong> Ambas clases heredan el atributo <code>self.mu</code>, calculado automáticamente en el constructor.
+                                </li>
+                                <li>
+                                    <strong>Extender con nuevos métodos:</strong> Puedes agregar <code>desviacion_estandar()</code> en la clase base y cada hija lo heredará:
+                                    <br /><code>def desviacion_estandar(self): return self.varianza() ** 0.5</code>
+                                </li>
+                            </ol>
+                        </div>
+
+                        <div className="tip-box p-4 rounded-lg mt-4 text-gray-800">
+                            <h4 className="font-bold text-secondary mb-3 flex items-center gap-2">
+                                <i className="fas fa-exclamation-triangle text-gold"></i> Recomendaciones
+                            </h4>
+                            <ul className="list-disc pl-5 space-y-2 text-sm">
+                                <li><strong>No instanciar <code>EstadisticaBase</code> directamente.</strong> Su método <code>.varianza()</code> lanza <code>NotImplementedError</code>. Siempre utiliza <code>Poblacion</code> o <code>Muestra</code>.</li>
+                                <li><strong>Validar los datos de entrada:</strong> Asegúrate de pasar una lista con al menos 2 elementos numéricos. Con un solo dato, la varianza muestral genera una división por cero.</li>
+                                <li><strong>Usar la clase adecuada:</strong> En la mayoría de proyectos estadísticos reales, trabajarás con <code>Muestra</code> (N−1), ya que rara vez se tiene acceso a toda la población.</li>
+                                <li><strong>Aprovechar el polimorfismo:</strong> Puedes escribir funciones que reciban cualquier objeto <code>EstadisticaBase</code> y funcionen sin importar si es <code>Poblacion</code> o <code>Muestra</code>.</li>
+                            </ul>
+                        </div>
+                    </div>
+                ),
+                pythonCode: `class EstadisticaBase:
+    def __init__(self, datos):
+        self.datos = datos
+        self.mu = sum(datos) / len(datos)
+
+    def varianza(self):
+        raise NotImplementedError("Usar subclase")
+
+class Poblacion(EstadisticaBase):
+    def varianza(self):
+        # Divide por N
+        numerador = sum((x - self.mu) ** 2 for x in self.datos)
+        return numerador / len(self.datos)
+
+class Muestra(EstadisticaBase):
+    def varianza(self):
+        # Divide por N - 1 (Corrección de Bessel)
+        numerador = sum((x - self.mu) ** 2 for x in self.datos)
+        return numerador / (len(self.datos) - 1)
+
+# Calificaciones de TODOS los estudiantes de un curso pequeño (población)
+calificaciones_curso = [85, 90, 78, 92, 88]
+pob = Poblacion(calificaciones_curso)
+
+print(f"Media del curso: {pob.mu:.2f}")
+print(f"Varianza poblacional: {pob.varianza():.2f}")
+print(f"Desv. estándar poblacional: {pob.varianza()**0.5:.2f}")
+
+# Calificaciones de una muestra aleatoria de estudiantes de toda la universidad
+muestra_uni = [85, 90, 78, 92, 88, 76, 95, 89]
+muest = Muestra(muestra_uni)
+
+print(f"\\nMedia muestral: {muest.mu:.2f}")
+print(f"Varianza muestral: {muest.varianza():.2f}")
+print(f"Desv. estándar muestral: {muest.varianza()**0.5:.2f}")`,
+                interactiveType: 'inheritance'
+            }
+        ];
+
+        // --- Componente Principal de la App ---
+
+        const App = () => {
+            const [activeLessonIndex, setActiveLessonIndex] = useState(0);
+            const [userInput, setUserInput] = useState("10, 15, 12, 18, 20");
+            const [simulationResult, setSimulationResult] = useState(null);
+            const [sidebarOpen, setSidebarOpen] = useState(true);
+
+            const activeLesson = curriculum[activeLessonIndex];
+
+            // Renderizado seguro de Iconos
+            const renderIcon = (iconName, size = 20) => {
+                const Icon = Icons[iconName];
+                return Icon ? <Icon size={size} /> : null;
+            };
+
+            // Lógica de simulación estadística en JS para emular Python
+            const runSimulation = () => {
+                try {
+                    const data = userInput.split(',').map(n => parseFloat(n.trim())).filter(n => !isNaN(n));
+
+                    if (data.length < 2) {
+                        setSimulationResult({ error: "Por favor ingresa al menos 2 números separados por coma." });
+                        return;
+                    }
+
+                    const sum = data.reduce((a, b) => a + b, 0);
+                    const mean = sum / data.length;
+
+                    // Cálculo Mediana
+                    const sorted = [...data].sort((a, b) => a - b);
+                    const mid = Math.floor(sorted.length / 2);
+                    const median = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+
+                    // Cálculos de Varianza
+                    const sumSqDiff = data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0);
+                    const varPop = sumSqDiff / data.length;
+                    const varSample = sumSqDiff / (data.length - 1);
+
+                    setSimulationResult({
+                        data: data,
+                        n: data.length,
+                        mean: mean.toFixed(2),
+                        median: median.toFixed(2),
+                        varPop: varPop.toFixed(2),
+                        varSample: varSample.toFixed(2),
+                        stdPop: Math.sqrt(varPop).toFixed(2),
+                        stdSample: Math.sqrt(varSample).toFixed(2)
+                    });
+
+                } catch (e) {
+                    setSimulationResult({ error: "Error en los datos de entrada." });
+                }
+            };
+
+            useEffect(() => {
+                runSimulation();
+            }, [userInput, activeLessonIndex]);
+
+            return (
+                <div className="flex h-screen overflow-hidden relative">
+
+                    {/* Botón flotante para toggle del sidebar */}
+                    <button
+                        onClick={() => setSidebarOpen(prev => !prev)}
+                        className="fixed top-4 left-4 z-50 p-2.5 rounded-full shadow-lg text-white transition-all hover:scale-110"
+                        style={{ background: 'linear-gradient(140deg, #3D008D 0%, #ED1E79 100%)' }}
+                        title={sidebarOpen ? 'Ocultar menú' : 'Mostrar menú'}
+                    >
+                        <i className={`fas ${sidebarOpen ? 'fa-times' : 'fa-bars'} text-sm`}></i>
+                    </button>
+
+                    {/* Overlay cuando sidebar está abierto (para cerrar al hacer clic fuera) */}
+                    {sidebarOpen && (
+                        <div
+                            className="fixed inset-0 bg-black/20 z-30 lg:hidden"
+                            onClick={() => setSidebarOpen(false)}
+                        />
+                    )}
+
+                    {/* Sidebar de Navegación */}
+                    <div
+                        className="flex-shrink-0 overflow-y-auto z-40 flex flex-col"
+                        style={{
+                            background: 'linear-gradient(180deg, #001A4D 0%, #002868 100%)',
+                            width: sidebarOpen ? '16rem' : '0',
+                            minWidth: sidebarOpen ? '16rem' : '0',
+                            opacity: sidebarOpen ? 1 : 0,
+                            transition: 'width 0.3s ease, min-width 0.3s ease, opacity 0.25s ease',
+                            overflow: sidebarOpen ? 'visible auto' : 'hidden'
+                        }}
+                    >
+                        <div className="p-6 pt-16 border-b border-white/10">
+                            <h1 className="text-white font-bold text-lg tracking-tight flex items-center gap-2 whitespace-nowrap">
+                                <span className="text-secondary">py</span>Stats<span className="text-gold">OOP</span>
+                            </h1>
+                            <p className="text-xs text-white/50 mt-1 whitespace-nowrap">Material de Estudio Autónomo • USTA</p>
+                        </div>
+                        <nav className="p-4 space-y-2">
+                            {curriculum.map((lesson, idx) => (
+                                <button
+                                    key={lesson.id}
+                                    onClick={() => { setActiveLessonIndex(idx); if (window.innerWidth < 1024) setSidebarOpen(false); }}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm rounded-lg transition-all whitespace-nowrap ${activeLessonIndex === idx
+                                        ? 'text-white shadow-lg'
+                                        : 'text-white/60 hover:text-white hover:bg-white/10'
+                                        }`}
+                                    style={activeLessonIndex === idx ? { background: 'linear-gradient(140deg, #3D008D 0%, #ED1E79 100%)' } : {}}
+                                >
+                                    {renderIcon(lesson.icon, 18)}
+                                    <span className="font-medium text-left">{lesson.title.split(':')[0]}</span>
+                                </button>
+                            ))}
+                        </nav>
+                        <div className="p-6 mt-auto">
+                            <div className="text-xs text-white/40 text-center whitespace-nowrap">
+                                Basado en conceptos de<br />Towards Data Science
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Área Principal */}
+                    <main className="flex-1 flex overflow-hidden bg-bg">
+
+                        {/* Panel Izquierdo: Teoría */}
+                        <div className="flex-1 overflow-y-auto p-8 lg:p-12 max-w-3xl">
+                            <div className="mb-6 flex items-center justify-between">
+                                <span className="text-xs font-bold tracking-wider text-secondary uppercase">Lección {activeLessonIndex + 1} de {curriculum.length}</span>
+                                <div className="flex gap-2">
+                                    <button
+                                        disabled={activeLessonIndex === 0}
+                                        onClick={() => setActiveLessonIndex(c => c - 1)}
+                                        className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                                    >
+                                        {renderIcon('ChevronLeft')}
+                                    </button>
+                                    <button
+                                        disabled={activeLessonIndex === curriculum.length - 1}
+                                        onClick={() => setActiveLessonIndex(c => c + 1)}
+                                        className="p-2 rounded-full hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                                    >
+                                        {renderIcon('ChevronRight')}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <SectionHeader title={activeLesson.title} icon={Icons[activeLesson.icon]} />
+
+                            <div className="prose prose-lg text-gray-600 leading-relaxed">
+                                {activeLesson.content}
+                            </div>
+
+                            <div className="mt-8">
+                                <h3 className="text-sm font-bold text-primary uppercase tracking-wide mb-2">Código Python de Ejemplo</h3>
+                                <CodeBlock code={activeLesson.pythonCode} />
+                            </div>
+                        </div>
+
+                        {/* Panel Derecho: Laboratorio Interactivo */}
+                        <div className="w-96 bg-gray-50 border-l border-gray-200 flex flex-col flex-shrink-0">
+                            <div className="p-6 bg-white border-b border-gray-200 shadow-sm z-10">
+                                <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-4">
+                                    {renderIcon('Terminal', 18)} Laboratorio de Datos
+                                </h3>
+                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-2">Ingresa tus datos (CSV)</label>
+                                <input
+                                    type="text"
+                                    value={userInput}
+                                    onChange={(e) => setUserInput(e.target.value)}
+                                    className="w-full font-mono text-sm p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-secondary focus:border-secondary outline-none transition-all"
+                                    placeholder="Ej: 10, 20, 30"
+                                />
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                                {simulationResult?.error ? (
+                                    <div className="p-4 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">
+                                        {simulationResult.error}
+                                    </div>
+                                ) : simulationResult && (
+                                    <>
+                                        {/* Visualización del Objeto */}
+                                        <div className="usta-card p-4 relative overflow-hidden group">
+                                            <div className="absolute top-0 left-0 w-1 h-full usta-gradient"></div>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className="text-xs font-bold text-primary uppercase">Instancia (Objeto)</span>
+                                                <span className="text-[10px] font-mono bg-gray-100 text-gray-500 px-2 py-0.5 rounded">0x7f...3a</span>
+                                            </div>
+                                            <div className="font-mono text-sm text-gray-700">
+                                                <div className="mb-1"><span className="text-secondary">self</span>.n = {simulationResult.n}</div>
+                                                <div className="break-words"><span className="text-secondary">self</span>.datos = [{simulationResult.data.join(', ')}]</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Resultados Dinámicos según la lección */}
+                                        {activeLesson.interactiveType === 'concept' && (
+                                            <div className="text-sm text-gray-500 text-center italic">
+                                                Explora las siguientes lecciones para ver cálculos específicos.
+                                            </div>
+                                        )}
+
+                                        {(activeLesson.interactiveType === 'instantiation' || activeLesson.interactiveType === 'methods') && (
+                                            <div className="space-y-3">
+                                                <div className="p-3 bg-white rounded-lg border border-gray-200 flex justify-between items-center shadow-sm hover:shadow-md transition-shadow">
+                                                    <span className="text-sm text-gray-600">Método <code>.media()</code></span>
+                                                    <span className="font-mono font-bold text-primary">{simulationResult.mean}</span>
+                                                </div>
+                                                <div className="p-3 bg-white rounded-lg border border-gray-200 flex justify-between items-center shadow-sm hover:shadow-md transition-shadow">
+                                                    <span className="text-sm text-gray-600">Método <code>.mediana()</code></span>
+                                                    <span className="font-mono font-bold text-secondary">{simulationResult.median}</span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {activeLesson.interactiveType === 'class_components' && (
+                                            <div className="space-y-3">
+                                                <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                                                    <div className="text-xs font-bold text-amber-800 uppercase mb-1">Atributo de Clase (Compartido)</div>
+                                                    <div className="font-mono text-sm text-amber-900">
+                                                        AnalizadorDatos.confianza = <span className="font-bold">0.95</span>
+                                                    </div>
+                                                </div>
+                                                <div className="p-3 rounded-lg tip-box">
+                                                    <div className="text-xs font-bold text-primary uppercase mb-1">Atributo de Instancia (Único)</div>
+                                                    <div className="font-mono text-sm text-gray-800">
+                                                        self.datos = [{simulationResult.data.join(', ')}]
+                                                    </div>
+                                                </div>
+                                                <div className="text-xs text-gray-500 text-center mt-2">
+                                                    Si crearas otro objeto, <code>datos</code> cambiaría, pero <code>confianza</code> seguiría siendo 0.95.
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {activeLesson.interactiveType === 'inheritance' && (
+                                            <div className="space-y-4 animate-fade-in">
+                                                <div className="p-4 rounded-lg tip-box">
+                                                    <h4 className="text-xs font-bold text-primary uppercase mb-2">Clase Hija: Poblacion</h4>
+                                                    <div className="flex justify-between text-sm mb-1">
+                                                        <span>Varianza (÷ N)</span>
+                                                        <span className="font-mono font-bold">{simulationResult.varPop}</span>
+                                                    </div>
+                                                    <div className="flex justify-between text-sm text-primary">
+                                                        <span>Desv. Estándar</span>
+                                                        <span className="font-mono">{simulationResult.stdPop}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                                                    <h4 className="text-xs font-bold text-secondary uppercase mb-2">Clase Hija: Muestra</h4>
+                                                    <div className="flex justify-between text-sm mb-1">
+                                                        <span>Varianza (÷ N-1)</span>
+                                                        <span className="font-mono font-bold">{simulationResult.varSample}</span>
+                                                    </div>
+                                                    <div className="flex justify-between text-sm text-secondary">
+                                                        <span>Desv. Estándar</span>
+                                                        <span className="font-mono">{simulationResult.stdSample}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="text-xs text-gray-400 text-center">
+                                                    Nota cómo el mismo método <code>.varianza()</code> da resultados diferentes según la clase usada. Eso es <strong>Polimorfismo</strong>.
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
