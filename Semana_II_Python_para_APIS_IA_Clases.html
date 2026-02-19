@@ -339,14 +339,14 @@
         const AIClassBuilder = () => {
             const [concept, setConcept] = useState('');
             const [apiKey, setApiKey] = useState('');
-            const [model, setModel] = useState(() => localStorage.getItem('gemini_model') || 'gemini-2.5-flash-preview-09-2025');
+            const [model, setModel] = useState(() => localStorage.getItem('gemini_model') || 'gemini-2.5-flash');
             const [showKey, setShowKey] = useState(false);
             const [generatedCode, setGeneratedCode] = useState(null);
             const [loading, setLoading] = useState(false);
             const [error, setError] = useState(null);
 
             const models = [
-                { id: 'gemini-2.5-flash-preview-09-2025', name: 'Gemini 2.5 Flash (más reciente)' },
+                { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (más reciente)' },
                 { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (rápido)' },
                 { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (estable)' },
                 { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (avanzado)' }
@@ -969,7 +969,7 @@ class GeneradorClases:
     Encapsula la configuración, el prompt y la comunicación con la IA.
     """
 
-    def __init__(self, modelo="gemini-2.5-flash-preview-09-2025"):
+    def __init__(self, modelo="gemini-2.5-flash"):
         # Leer la API Key de variable de entorno (seguro)
         api_key = os.environ.get("GEMINI_API_KEY")
 
