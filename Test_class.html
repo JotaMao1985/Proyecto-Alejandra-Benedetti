@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python POO para Estadística + Gemini AI</title>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+    <!-- Babel para JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        code,
+        pre {
+            font-family: 'Fira Code', monospace;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .syntax-kwd {
+            color: #c678dd;
+            font-weight: bold;
+        }
+
+        .syntax-cls {
+            color: #e5c07b;
+        }
+
+        .syntax-str {
+            color: #98c379;
+        }
+
+        .syntax-com {
+            color: #5c6370;
+            font-style: italic;
+        }
+
+        .syntax-func {
+            color: #61afef;
+        }
+
+        .syntax-self {
+            color: #e06c75;
+            font-style: italic;
+        }
+
+        .syntax-num {
+            color: #d19a66;
+        }
+
+        /* Animations */
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade-in {
+            animation: fade-in 0.5s ease-out forwards;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- Configuración de Gemini API ---
+        // Se deja vacío para inyección de entorno, o el usuario la ingresa en la UI
+        const envApiKey = "";
+
+        async function callGeminiAPI(prompt, systemInstruction = "", key = "") {
+            if (!key) {
+                return "⚠️ CLAVE FALTANTE: Por favor configura tu API Key en el botón de engranaje (⚙️) abajo a la izquierda para activar la IA.";
+            }
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`;
+
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: systemInstruction }] }
+            };
+
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errData = await response.json();
+                        throw new Error(errData.error?.message || `HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    return data.candidates?.[0]?.content?.parts?.[0]?.text || "No se pudo obtener respuesta.";
+                } catch (error) {
+                    console.error("Gemini API Error:", error);
+                    if (attempt === 2) return `Error: ${error.message}. Verifica tu API Key.`;
+                    await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+                }
+            }
+        }
+
+        // --- Iconos SVG Inline ---
+        const Icons = {
+            BookOpen: ({ size = 24, className = "" }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+            ),
+            Box: ({ size = 24, className = "" }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            ),
+            Activity: ({ size = 24, className = "" }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+            ),
+            GitBranch: ({ size = 24, className = "" }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></svg>
+            ),
+            Terminal: ({ size = 24, className = "" }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+            ),
+            ChevronLeft: ({ size = 24, className = "" }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="15 18 9 12 15 6"></polyline></svg>
+            ),
+            ChevronRight: ({ size = 24, className = "" }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="9 18 15 12 9 6"></polyline></svg>
+            ),
+            Sparkles: ({ size = 24, className = "" }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" /></svg>
+            ),
+            Brain: ({ size = 24, className = "" }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z" /><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z" /></svg>
+            ),
+            Settings: ({ size = 24, className = "" }) => (
+                <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            )
+        };
+
+        // --- Componentes de UI ---
+
+        const CodeBlock = ({ code, lessonTitle, enableExplanation = true, apiKey }) => {
+            const [explanation, setExplanation] = useState(null);
+            const [loading, setLoading] = useState(false);
+
+            const handleExplain = async () => {
+                setLoading(true);
+                setExplanation(null);
+                const systemPrompt = "Eres un profesor experto de Python y POO. Explica el código proporcionado de forma concisa y amigable para principiantes. Usa markdown simple.";
+                const userPrompt = `Explica este código:\n\n${code}`;
+
+                const response = await callGeminiAPI(userPrompt, systemPrompt, apiKey);
+                setExplanation(response);
+                setLoading(false);
+            };
+
+            const formatCode = (str) => {
+                let formatted = str
+                    .replace(/import /g, '<span class="syntax-kwd">import </span>')
+                    .replace(/class /g, '<span class="syntax-kwd">class </span>')
+                    .replace(/def /g, '<span class="syntax-kwd">def </span>')
+                    .replace(/return /g, '<span class="syntax-kwd">return </span>')
+                    .replace(/self/g, '<span class="syntax-self">self</span>')
+                    .replace(/__init__/g, '<span class="syntax-func">__init__</span>')
+                    .replace(/#/g, '<span class="syntax-com">#');
+                return { __html: formatted };
+            };
+
+            return (
+                <div className="relative group">
+                    <div className="bg-slate-800 text-slate-100 p-4 rounded-lg shadow-inner overflow-x-auto text-sm leading-relaxed border border-slate-700 my-4">
+                        <pre dangerouslySetInnerHTML={formatCode(code)} />
+                    </div>
+
+                    {enableExplanation && (
+                        <div className="flex justify-end mt-2">
+                            <button
+                                onClick={handleExplain}
+                                disabled={loading}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full hover:bg-indigo-100 transition-colors border border-indigo-200"
+                            >
+                                {loading ? (
+                                    <span className="animate-spin h-3 w-3 border-2 border-indigo-600 border-t-transparent rounded-full"></span>
+                                ) : (
+                                    <Icons.Sparkles size={14} />
+                                )}
+                                {loading ? 'Consultando...' : 'Explicar con IA'}
+                            </button>
+                        </div>
+                    )}
+
+                    {explanation && (
+                        <div className="mt-3 p-4 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg border border-indigo-100 text-sm text-slate-700 shadow-sm animate-fade-in">
+                            <h4 className="flex items-center gap-2 font-bold text-indigo-800 mb-2 text-xs uppercase tracking-wide">
+                                <Icons.Brain size={14} /> Tutor IA dice:
+                            </h4>
+                            <div className="prose prose-sm max-w-none">
+                                {explanation.split('\n').map((line, i) => <p key={i} className="mb-1">{line}</p>)}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const SectionHeader = ({ title, icon: Icon }) => (
+            <div className="flex items-center gap-3 mb-4 border-b border-gray-200 pb-2">
+                <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+                    {Icon && <Icon size={24} />}
+                </div>
+                <h2 className="text-2xl font-bold text-slate-800">{title}</h2>
+            </div>
+        );
+
+        // --- Lógica del Curso (Data) ---
+
+        const curriculum = [
+            {
+                id: 'intro',
+                title: 'Introducción: El Concepto',
+                icon: 'BookOpen',
+                content: (
+                    <div>
+                        <p className="mb-4">
+                            La Programación Orientada a Objetos (POO) trata de agrupar datos y funciones en una sola entidad.
+                            Pensemos en algo cotidiano: <strong>Una Moneda</strong>.
+                        </p>
+                        <ul className="list-disc pl-5 space-y-2 mb-4 text-sm">
+                            <li><strong>Estado (Atributos):</strong> Tiene una cara visible (Cara o Cruz).</li>
+                            <li><strong>Comportamiento (Métodos):</strong> Puede ser lanzada al aire.</li>
+                        </ul>
+                        <p className="mb-4">
+                            En este curso aplicaremos esta lógica para crear un <strong>Analizador Estadístico</strong>.
+                        </p>
+                    </div>
+                ),
+                pythonCode: `import random
+
+class Coin:
+    def __init__(self):
+        # El Constructor: Define el estado inicial
+        self.sideup = "Heads"
+
+    def toss(self):
+        # Un Método: Acción que cambia el estado
+        if random.randint(0, 1) == 0:
+            self.sideup = "Heads"
+        else:
+            self.sideup = "Tails"
+
+    def get_sideup(self):
+        return self.sideup
+
+mi_moneda = Coin()
+mi_moneda.toss()
+print(mi_moneda.get_sideup())`,
+                interactiveType: 'concept'
+            },
+            {
+                id: 'class_obj',
+                title: 'Clases y el Constructor',
+                icon: 'Box',
+                content: (
+                    <div>
+                        <p className="mb-4">
+                            Aplicaremos lo aprendido al <code>AnalizadorDatos</code>.
+                            Al igual que la moneda, nuestro analizador necesita iniciar con datos usando <code>__init__</code>.
+                        </p>
+                    </div>
+                ),
+                pythonCode: `class AnalizadorDatos:
+    def __init__(self, lista_numeros):
+        # Guardamos la lista dentro del objeto
+        self.datos = lista_numeros
+        self.n = len(lista_numeros)
+        print(f"Analizador iniciado con {self.n} datos")
+
+mi_estudio = AnalizadorDatos([5, 8, 12, 3])`,
+                interactiveType: 'instantiation'
+            },
+            {
+                id: 'class_components',
+                title: 'Componentes: Atributos de Clase',
+                icon: 'Box',
+                content: (
+                    <div>
+                        <p className="mb-4">
+                            ¿Qué pasa si queremos un valor compartido por <strong>todos</strong> los analizadores?
+                            Usamos <strong>Atributos de Clase</strong> (compartidos) vs <strong>Atributos de Instancia</strong> (únicos).
+                        </p>
+                    </div>
+                ),
+                pythonCode: `class AnalizadorDatos:
+    # Atributo de Clase (Compartido)
+    confianza = 0.95
+
+    def __init__(self, datos):
+        # Atributo de Instancia (Único)
+        self.datos = datos
+
+estudio1 = AnalizadorDatos([1, 2, 3])
+estudio2 = AnalizadorDatos([8, 9, 10])
+
+print(estudio1.confianza) # 0.95`,
+                interactiveType: 'class_components'
+            },
+            {
+                id: 'methods',
+                title: 'Métodos: Dando vida al objeto',
+                icon: 'Activity',
+                content: (
+                    <div>
+                        <p className="mb-4">
+                            Vamos a añadir métodos para calcular medidas de tendencia central.
+                            Los métodos usan <code>self.datos</code> para acceder a la información propia del objeto.
+                        </p>
+                    </div>
+                ),
+                pythonCode: `class AnalizadorDatos:
+    def __init__(self, datos):
+        self.datos = datos
+
+    def media(self):
+        return sum(self.datos) / len(self.datos)
+
+    def mediana(self):
+        sorted_data = sorted(self.datos)
+        n = len(sorted_data)
+        mid = n // 2
+        return sorted_data[mid] if n % 2 != 0 else (sorted_data[mid-1] + sorted_data[mid]) / 2`,
+                interactiveType: 'methods'
+            },
+            {
+                id: 'inheritance',
+                title: 'Herencia y Polimorfismo',
+                icon: 'GitBranch',
+                content: (
+                    <div>
+                        <p className="mb-4">
+                            Creamos una clase base genérica y dos clases hijas (Poblacion y Muestra) que modifican el cálculo de la Varianza.
+                        </p>
+                    </div>
+                ),
+                pythonCode: `class EstadisticaBase:
+    def __init__(self, datos):
+        self.datos = datos
+        self.mu = sum(datos) / len(datos)
+    def varianza(self): raise NotImplementedError
+
+class Poblacion(EstadisticaBase):
+    def varianza(self):
+        return sum((x - self.mu)**2 for x in self.datos) / len(self.datos)
+
+class Muestra(EstadisticaBase):
+    def varianza(self):
+        return sum((x - self.mu)**2 for x in self.datos) / (len(self.datos) - 1)`,
+                interactiveType: 'inheritance'
+            },
+            {
+                id: 'class_builder',
+                title: 'Taller: Constructor de Clases IA',
+                icon: 'Sparkles',
+                content: (
+                    <div>
+                        <p className="mb-4">
+                            ¿Te preguntas cómo se vería una clase para un <strong>"Videojuego"</strong> o un <strong>"Planeta"</strong>?
+                        </p>
+                        <p className="mb-4">
+                            En este taller interactivo, tú pones el concepto y nuestra <strong>IA Generativa</strong> construye la estructura de la clase Python por ti, incluyendo atributos lógicos y métodos funcionales.
+                        </p>
+                        <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg border border-purple-100 text-purple-900 text-sm">
+                            <strong>Instrucciones:</strong> Usa el panel derecho para escribir cualquier cosa (ej. "Cuenta Bancaria", "Guerrero", "Átomo") y observa cómo la IA modela ese objeto.
+                        </div>
+                    </div>
+                ),
+                pythonCode: `# El código aparecerá en el panel derecho...`,
+                interactiveType: 'class_builder'
+            }
+        ];
+
+        // --- Componente Principal de la App ---
+
+        const App = () => {
+            const [activeLessonIndex, setActiveLessonIndex] = useState(0);
+            const [userInput, setUserInput] = useState("10, 15, 12, 18, 20");
+            const [simulationResult, setSimulationResult] = useState(null);
+
+            // Estado de API Key
+            const [userApiKey, setUserApiKey] = useState("");
+            const [showSettings, setShowSettings] = useState(false);
+
+            // Clave efectiva
+            const effectiveApiKey = envApiKey || userApiKey;
+
+            // AI Data Analysis State
+            const [aiAnalysis, setAiAnalysis] = useState(null);
+            const [analyzing, setAnalyzing] = useState(false);
+
+            // AI Class Builder State
+            const [builderConcept, setBuilderConcept] = useState("");
+            const [generatedClassCode, setGeneratedClassCode] = useState(null);
+            const [buildingClass, setBuildingClass] = useState(false);
+
+            const activeLesson = curriculum[activeLessonIndex];
+
+            const renderIcon = (iconName, size = 20) => {
+                const Icon = Icons[iconName];
+                return Icon ? <Icon size={size} /> : null;
+            };
+
+            // Simulación Estadística
+            const runSimulation = () => {
+                try {
+                    setAiAnalysis(null);
+                    const data = userInput.split(',').map(n => parseFloat(n.trim())).filter(n => !isNaN(n));
+
+                    if (data.length < 2) {
+                        setSimulationResult({ error: "Ingresa al menos 2 números." });
+                        return;
+                    }
+
+                    const sum = data.reduce((a, b) => a + b, 0);
+                    const mean = sum / data.length;
+                    const sorted = [...data].sort((a, b) => a - b);
+                    const mid = Math.floor(sorted.length / 2);
+                    const median = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+                    const sumSqDiff = data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0);
+                    const varPop = sumSqDiff / data.length;
+                    const varSample = sumSqDiff / (data.length - 1);
+
+                    setSimulationResult({
+                        data: data,
+                        n: data.length,
+                        mean: mean.toFixed(2),
+                        median: median.toFixed(2),
+                        varPop: varPop.toFixed(2),
+                        varSample: varSample.toFixed(2),
+                        stdPop: Math.sqrt(varPop).toFixed(2),
+                        stdSample: Math.sqrt(varSample).toFixed(2)
+                    });
+                } catch (e) {
+                    setSimulationResult({ error: "Error en datos." });
+                }
+            };
+
+            // Gemini Feature 1: Data Analysis
+            const analyzeWithGemini = async () => {
+                if (!effectiveApiKey) {
+                    setShowSettings(true);
+                    return;
+                }
+                if (!simulationResult || simulationResult.error) return;
+                setAnalyzing(true);
+                const systemPrompt = "Eres un científico de datos. Analiza brevemente estos números. Busca patrones y sugiere un ejemplo real de qué podrían ser.";
+                const userPrompt = `Analiza: [${userInput}]. Media: ${simulationResult.mean}, Mediana: ${simulationResult.median}`;
+                const result = await callGeminiAPI(userPrompt, systemPrompt, effectiveApiKey);
+                setAiAnalysis(result);
+                setAnalyzing(false);
+            };
+
+            // Gemini Feature 2: Class Builder
+            const generateClassWithGemini = async () => {
+                if (!effectiveApiKey) {
+                    setShowSettings(true);
+                    return;
+                }
+                if (!builderConcept.trim()) return;
+                setBuildingClass(true);
+                setGeneratedClassCode(null);
+
+                const systemPrompt = "Eres un experto en Python. Genera SOLO código Python (sin markdown, sin explicaciones externas). Crea una clase bien estructura con __init__ y 2 métodos.";
+                const userPrompt = `Crea una clase Python para el concepto: "${builderConcept}". 
+                Requisitos:
+                1. Nombre de clase en PascalCase.
+                2. __init__ con 2-3 atributos relevantes.
+                3. Dos métodos con print() simulando acciones.
+                4. Comentarios en español.
+                5. Código ejecutable y limpio.`;
+
+                const result = await callGeminiAPI(userPrompt, systemPrompt, effectiveApiKey);
+                // Limpieza básica por si el modelo devuelve markdown
+                const cleanCode = result.replace(/```python/g, '').replace(/```/g, '').trim();
+                setGeneratedClassCode(cleanCode);
+                setBuildingClass(false);
+            };
+
+            useEffect(() => {
+                runSimulation();
+            }, [userInput, activeLessonIndex]);
+
+            return (
+                <div className="flex h-screen overflow-hidden relative">
+                    {/* Settings Modal */}
+                    {showSettings && (
+                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
+                            <div className="bg-white rounded-xl shadow-2xl p-6 w-96 max-w-full m-4">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                        <Icons.Settings className="text-slate-500" /> Configuración API
+                                    </h3>
+                                    <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+                                </div>
+                                <p className="text-sm text-slate-600 mb-4">
+                                    Para usar las funciones de IA, necesitas una API Key de Google Gemini (es gratuita).
+                                </p>
+                                <input
+                                    type="password"
+                                    value={userApiKey}
+                                    onChange={(e) => setUserApiKey(e.target.value)}
+                                    placeholder="Pega tu API Key aquí..."
+                                    className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                                <div className="flex justify-end gap-2">
+                                    <a
+                                        href="https://aistudio.google.com/app/apikey"
+                                        target="_blank"
+                                        className="px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg"
+                                    >
+                                        Obtener Key
+                                    </a>
+                                    <button
+                                        onClick={() => setShowSettings(false)}
+                                        className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                    >
+                                        Guardar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Sidebar */}
+                    <div className="w-64 bg-slate-900 text-slate-300 flex-shrink-0 overflow-y-auto flex flex-col">
+                        <div className="p-6 border-b border-slate-800">
+                            <h1 className="text-white font-bold text-lg tracking-tight flex items-center gap-2">
+                                <span className="text-blue-500">py</span>Stats<span className="text-yellow-500">OOP</span>
+                            </h1>
+                            <p className="text-xs text-slate-500 mt-1">Material Interactivo + IA</p>
+                        </div>
+                        <nav className="p-4 space-y-2 flex-1">
+                            {curriculum.map((lesson, idx) => (
+                                <button
+                                    key={lesson.id}
+                                    onClick={() => setActiveLessonIndex(idx)}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm rounded-lg transition-all ${activeLessonIndex === idx
+                                            ? 'bg-blue-600 text-white shadow-lg'
+                                            : 'hover:bg-slate-800 hover:text-white'
+                                        }`}
+                                >
+                                    {renderIcon(lesson.icon, 18)}
+                                    <span className="font-medium text-left">{lesson.title.split(':')[0]}</span>
+                                </button>
+                            ))}
+                        </nav>
+                        <div className="p-4 border-t border-slate-800">
+                            <button
+                                onClick={() => setShowSettings(true)}
+                                className="w-full flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+                            >
+                                <Icons.Settings size={14} />
+                                {effectiveApiKey ? "API Configurada" : "Configurar API Key"}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Main Area */}
+                    <main className="flex-1 flex overflow-hidden bg-white">
+
+                        {/* Theory Panel */}
+                        <div className="flex-1 overflow-y-auto p-8 lg:p-12 max-w-3xl">
+                            <div className="mb-6 flex items-center justify-between">
+                                <span className="text-xs font-bold tracking-wider text-slate-400 uppercase">Lección {activeLessonIndex + 1} de {curriculum.length}</span>
+                                <div className="flex gap-2">
+                                    <button disabled={activeLessonIndex === 0} onClick={() => setActiveLessonIndex(c => c - 1)} className="p-2 rounded-full hover:bg-slate-100 disabled:opacity-30">{renderIcon('ChevronLeft')}</button>
+                                    <button disabled={activeLessonIndex === curriculum.length - 1} onClick={() => setActiveLessonIndex(c => c + 1)} className="p-2 rounded-full hover:bg-slate-100 disabled:opacity-30">{renderIcon('ChevronRight')}</button>
+                                </div>
+                            </div>
+
+                            <SectionHeader title={activeLesson.title} icon={Icons[activeLesson.icon]} />
+
+                            <div className="prose prose-slate prose-lg text-slate-600 leading-relaxed">
+                                {activeLesson.content}
+                            </div>
+
+                            {activeLesson.id !== 'class_builder' && (
+                                <div className="mt-8">
+                                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide mb-2">Código Python de Ejemplo</h3>
+                                    <CodeBlock code={activeLesson.pythonCode} apiKey={effectiveApiKey} />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Interactive Panel */}
+                        <div className="w-96 bg-slate-50 border-l border-slate-200 flex flex-col flex-shrink-0">
+
+                            {/* VISTA: CONSTRUCTOR DE CLASES */}
+                            {activeLesson.interactiveType === 'class_builder' ? (
+                                <div className="flex flex-col h-full">
+                                    <div className="p-6 bg-gradient-to-br from-purple-600 to-indigo-700 text-white shadow-md z-10">
+                                        <h3 className="font-bold flex items-center gap-2 mb-2">
+                                            {renderIcon('Sparkles', 18)} Constructor IA
+                                        </h3>
+                                        <p className="text-xs text-purple-100 mb-4 opacity-90">Ingresa un concepto y la IA diseñará la clase.</p>
+
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={builderConcept}
+                                                onChange={(e) => setBuilderConcept(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && generateClassWithGemini()}
+                                                className="flex-1 text-slate-900 font-medium text-sm p-2 rounded border border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                                                placeholder="Ej: Guerrero, Coche, Cuenta..."
+                                            />
+                                            <button
+                                                onClick={generateClassWithGemini}
+                                                disabled={buildingClass || !builderConcept}
+                                                className="bg-white text-purple-700 px-3 rounded font-bold hover:bg-purple-50 disabled:opacity-50 transition-colors"
+                                            >
+                                                {buildingClass ? '...' : 'Crear'}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1 overflow-y-auto p-6 bg-slate-100">
+                                        {generatedClassCode ? (
+                                            <div className="animate-fade-in">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="text-xs font-bold text-slate-500 uppercase">Clase Generada</span>
+                                                    <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded border border-green-200">Valid Python</span>
+                                                </div>
+                                                <div className="bg-white p-4 rounded-lg border border-slate-300 shadow-sm text-xs font-mono overflow-x-auto">
+                                                    <pre className="text-slate-700">{generatedClassCode}</pre>
+                                                </div>
+                                                <p className="mt-3 text-xs text-slate-500 text-center italic">
+                                                    "Observa cómo la IA eligió los atributos en __init__ para representar el estado."
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center p-8">
+                                                <Icons.Box size={48} className="mb-4 opacity-20" />
+                                                <p className="text-sm">Esperando tu idea...</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                /* VISTA: LABORATORIO DE DATOS (Normal) */
+                                <>
+                                    <div className="p-6 bg-white border-b border-slate-200 shadow-sm z-10">
+                                        <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4">
+                                            {renderIcon('Terminal', 18)} Laboratorio de Datos
+                                        </h3>
+                                        <label className="block text-xs font-semibold text-slate-500 uppercase mb-2">Ingresa tus datos (CSV)</label>
+                                        <input
+                                            type="text"
+                                            value={userInput}
+                                            onChange={(e) => setUserInput(e.target.value)}
+                                            className="w-full font-mono text-sm p-3 rounded border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                            placeholder="Ej: 10, 20, 30"
+                                        />
+                                    </div>
+
+                                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                                        {simulationResult?.error ? (
+                                            <div className="p-4 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">
+                                                {simulationResult.error}
+                                            </div>
+                                        ) : simulationResult && (
+                                            <>
+                                                {/* Visualización del Objeto */}
+                                                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
+                                                    <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <span className="text-xs font-bold text-blue-600 uppercase">Instancia (Objeto)</span>
+                                                        <span className="text-[10px] font-mono bg-slate-100 text-slate-500 px-2 py-0.5 rounded">0x7f...3a</span>
+                                                    </div>
+                                                    <div className="font-mono text-sm text-slate-700">
+                                                        <div className="mb-1"><span className="text-purple-600">self</span>.n = {simulationResult.n}</div>
+                                                        <div className="break-words"><span className="text-purple-600">self</span>.datos = [{simulationResult.data.join(', ')}]</div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Resultados Dinámicos */}
+                                                {(activeLesson.interactiveType === 'instantiation' || activeLesson.interactiveType === 'methods') && (
+                                                    <div className="space-y-3">
+                                                        <div className="p-3 bg-white rounded-lg border border-slate-200 flex justify-between items-center">
+                                                            <span className="text-sm text-slate-600">Método <code>.media()</code></span>
+                                                            <span className="font-mono font-bold text-blue-600">{simulationResult.mean}</span>
+                                                        </div>
+                                                        <div className="p-3 bg-white rounded-lg border border-slate-200 flex justify-between items-center">
+                                                            <span className="text-sm text-slate-600">Método <code>.mediana()</code></span>
+                                                            <span className="font-mono font-bold text-emerald-600">{simulationResult.median}</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {activeLesson.interactiveType === 'class_components' && (
+                                                    <div className="space-y-3">
+                                                        <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                                                            <div className="text-xs font-bold text-amber-800 uppercase mb-1">Atributo de Clase</div>
+                                                            <div className="font-mono text-sm text-amber-900">AnalizadorDatos.confianza = 0.95</div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {activeLesson.interactiveType === 'inheritance' && (
+                                                    <div className="space-y-4 animate-fade-in">
+                                                        <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+                                                            <h4 className="text-xs font-bold text-indigo-800 uppercase mb-2">Poblacion (÷ N)</h4>
+                                                            <div className="flex justify-between text-sm"><span className="font-mono font-bold">{simulationResult.varPop}</span></div>
+                                                        </div>
+                                                        <div className="bg-orange-50 p-4 rounded-lg border border-orange-100">
+                                                            <h4 className="text-xs font-bold text-orange-800 uppercase mb-2">Muestra (÷ N-1)</h4>
+                                                            <div className="flex justify-between text-sm"><span className="font-mono font-bold">{simulationResult.varSample}</span></div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Botón IA Analizar Datos */}
+                                                <div className="mt-6 pt-4 border-t border-slate-200">
+                                                    <button
+                                                        onClick={analyzeWithGemini}
+                                                        disabled={analyzing}
+                                                        className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white p-3 rounded-lg shadow-md transition-all flex items-center justify-center gap-2 font-semibold text-sm"
+                                                    >
+                                                        {analyzing ? <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span> : <Icons.Sparkles size={16} />}
+                                                        {analyzing ? "Analizando..." : "Interpretar con IA"}
+                                                    </button>
+                                                    {aiAnalysis && (
+                                                        <div className="mt-4 p-4 bg-violet-50 rounded-lg border border-violet-100 text-sm text-slate-700 animate-fade-in shadow-inner">
+                                                            <h5 className="font-bold text-violet-800 mb-2 flex items-center gap-2 text-xs uppercase"><Icons.Brain size={14} /> Gemini dice:</h5>
+                                                            <p className="leading-relaxed italic">"{aiAnalysis}"</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
