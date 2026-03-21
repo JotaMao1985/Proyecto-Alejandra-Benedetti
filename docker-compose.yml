@@ -1,0 +1,12 @@
+services:
+  llm-client:
+    build: .
+    container_name: entorno-llm-dev
+    volumes:
+      - ./app:/app
+      - ./data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - OLLAMA_HOST=http://host.docker.internal:11434/v1
+    command: tail -f /dev/null
