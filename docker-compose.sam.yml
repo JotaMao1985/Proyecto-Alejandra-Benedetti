@@ -1,0 +1,50 @@
+# docker-compose.sam.yml — Docker Compose para pipeline híbrido SAM 3 + VLM
+#
+# Uso:
+#   docker compose -f docker-compose.sam.yml up -d --build
+#
+#   # Una imagen
+#   docker exec entorno-sam python /app/app/analisis_estanteria_hybrid.py \
+#     --image /archive/images/0058.jpg
+#
+#   # 10% del dataset
+#   docker exec entorno-sam python /app/app/analisis_estanteria_hybrid.py \
+#     --sample 10 --max-workers 10
+#
+# NOTA: El modelo SAM 3 es gated en HuggingFace.
+#   1. Aceptar licencia en https://huggingface.co/facebook/sam3
+#   2. Exportar HF_TOKEN antes de levantar el compose:
+#      export HF_TOKEN=hf_xxxxx
+#      docker compose -f docker-compose.sam.yml up -d
+
+services:
+  llm-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.sam
+    container_name: entorno-sam
+    ports:
+      - "5050:5050"
+    volumes:
+      - ./app:/app/app
+      - ./archive:/archive
+      - ./data:/data/resultados
+      - ./models:/models
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    environment:
+      - OLLAMA_HOST=http://host.docker.internal:11434/v1
+      - OLLAMA_BASE=http://host.docker.internal:11434
+      - SAM_DEVICE=cpu
+      - HF_TOKEN=${HF_TOKEN:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    # Descomenta esta sección SOLO en Linux con NVIDIA GPU
+    # y cambia SAM_DEVICE=cuda arriba
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]

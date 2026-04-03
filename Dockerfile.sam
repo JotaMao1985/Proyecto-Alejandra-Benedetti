@@ -1,0 +1,43 @@
+FROM python:3.12-slim-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y \
+    nano \
+    git \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# PyTorch CPU (para GPU CUDA, instalar antes con --index-url cu126)
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+# SAM 3 y dependencias no declaradas en su setup.py
+RUN pip install --no-cache-dir einops pycocotools psutil
+
+# SAM 3 desde el repo de Meta
+RUN git clone https://github.com/facebookresearch/sam3.git /tmp/sam3 && \
+    cp -r /tmp/sam3/assets /app/sam3_assets && \
+    cd /tmp/sam3 && \
+    pip install --no-cache-dir . && \
+    rm -rf /tmp/sam3
+
+# Patches: SAM 3 tiene hardcodes de CUDA que impiden ejecutar en CPU.
+# 1. device="cuda" → detección automática de device
+RUN find /usr/local/lib/python3.12/site-packages/sam3/model -name "*.py" \
+    -exec sed -i 's/device="cuda"/device=("cuda" if __import__("torch").cuda.is_available() else "cpu")/g' {} +
+# 2. pin_memory() falla sin GPU — eliminarlo en geometry_encoders.py
+RUN sed -i 's/scale = scale.pin_memory().to(device=boxes_xyxy.device, non_blocking=True)/scale = scale.to(device=boxes_xyxy.device)/g' \
+    /usr/local/lib/python3.12/site-packages/sam3/model/geometry_encoders.py
+
+# Dependencias del proyecto
+COPY requirements_sam.txt .
+RUN pip install --no-cache-dir -r requirements_sam.txt
+
+COPY app/ /app/app/
+
+RUN mkdir -p /archive /data /models
+
+CMD ["tail", "-f", "/dev/null"]

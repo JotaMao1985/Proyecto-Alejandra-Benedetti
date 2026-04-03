@@ -1,0 +1,30 @@
+# requirements_sam.txt — Dependencias para pipeline híbrido SAM 3 + VLM
+# Uso: pip install -r requirements_sam.txt
+
+# Core
+openai>=1.0.0
+pypdf>=3.0.0
+PyMuPDF>=1.23.0
+Pillow>=10.0.0
+opencv-python-headless>=4.8.0
+numpy>=1.26,<2
+deskew
+dateparser
+openpyxl>=3.1.0
+flask>=3.0.0
+
+# SAM 3 dependencies
+timm>=1.0.17
+huggingface_hub
+
+# PyTorch (instalar según tu hardware ANTES de este requirements):
+# Linux GPU (CUDA 12.6+): pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+# macOS CPU (Apple Silicon): pip install torch torchvision
+# CPU only: pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+# SAM 3 (desde el repo de Meta):
+# git clone https://github.com/facebookresearch/sam3.git && cd sam3 && pip install -e .
+#
+# NOTA: El modelo es gated en HuggingFace. Requiere:
+#   1. Aceptar la licencia en https://huggingface.co/facebook/sam3
+#   2. Autenticarse: hf auth login (o exportar HF_TOKEN)

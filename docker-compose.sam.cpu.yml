@@ -1,0 +1,41 @@
+# docker-compose.sam.cpu.yml — Docker Compose para SAM 3 en CPU (macOS / Linux sin GPU)
+#
+# NOTA: SAM 3 NO soporta MPS (Apple Silicon GPU). En macOS solo funciona CPU.
+#       Para GPU se necesita NVIDIA CUDA — usar docker-compose.sam.yml con GPU habilitada.
+#
+# OPCIONES DE EJECUCIÓN EN MAC:
+#
+# Opción A — Docker con CPU (más simple, SAM lento ~5-10x):
+#   export HF_TOKEN=hf_xxxxx
+#   docker compose -f docker-compose.sam.cpu.yml up -d --build
+#   docker exec entorno-sam python /app/app/analisis_estanteria_hybrid.py \
+#     --image /archive/images/0058.jpg --sam-device cpu
+#
+# Opción B — Ejecutar directamente en el Mac (más rápido en CPU nativo):
+#   pip install torch torchvision
+#   git clone https://github.com/facebookresearch/sam3.git && cd sam3 && pip install -e .
+#   export HF_TOKEN=hf_xxxxx
+#   python app/analisis_estanteria_hybrid.py \
+#     --image archive/images/0058.jpg --sam-device cpu
+
+services:
+  llm-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.sam
+    container_name: entorno-sam
+    ports:
+      - "5050:5050"
+    volumes:
+      - ./app:/app/app
+      - ./archive:/archive
+      - ./data:/data/resultados
+      - ./models:/models
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    environment:
+      - OLLAMA_HOST=http://host.docker.internal:11434/v1
+      - OLLAMA_BASE=http://host.docker.internal:11434
+      - SAM_DEVICE=cpu
+      - HF_TOKEN=${HF_TOKEN:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
