@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <meta content="Informe técnico: Análisis de estanterías de supermercado con Vision Language Models locales"
+        name="description" />
+    <title>Informe: Análisis de Estanterías con VLM</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Montserrat', 'Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#3D008D',
+                        secondary: '#ED1E79',
+                        navy: '#001A4D',
+                        gold: '#FDB913',
+                        bg: '#F8FAFC',
+                        surface: '#FFFFFF',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: #F8FAFC;
+            color: #1E293B;
+            scroll-behavior: smooth;
+        }
+
+        code, pre {
+            font-family: 'Fira Code', monospace;
+        }
+
+        .usta-gradient {
+            background: linear-gradient(140deg, #3D008D 0%, #ED1E79 100%);
+        }
+
+        .usta-header {
+            background: linear-gradient(180deg, #001A4D 0%, #002868 100%);
+        }
+
+        .usta-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+        }
+
+        .usta-card:hover {
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12);
+            transform: translateY(-4px);
+        }
+
+        .tip-box {
+            background: linear-gradient(135deg, rgba(61, 0, 141, 0.08) 0%, rgba(237, 30, 121, 0.08) 100%);
+            border: 1px solid rgba(61, 0, 141, 0.2);
+        }
+
+        .warning-box {
+            background: linear-gradient(135deg, rgba(253, 185, 19, 0.12) 0%, rgba(237, 30, 121, 0.06) 100%);
+            border: 1px solid rgba(253, 185, 19, 0.4);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(90deg, rgba(61, 0, 141, 0.15) 0%, transparent 100%);
+            border-left: 4px solid #ED1E79;
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #3D008D, #ED1E79); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #4A00A8, #FF2D8A); }
+
+        .animate-fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .diagram {
+            font-family: 'Fira Code', monospace;
+            white-space: pre;
+            background: #fff;
+            border: 1px dashed #999;
+            padding: 1rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            font-size: 0.85rem;
+            color: #333;
+            border-radius: 8px;
+        }
+
+        /* Single-section view: hide all, show active */
+        article[id] {
+            display: none;
+            opacity: 0;
+            transform: translateY(16px);
+        }
+        article[id].active-section {
+            display: block;
+            animation: sectionIn 0.4s ease-out forwards;
+        }
+        @keyframes sectionIn {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Active nav link */
+        aside nav a.nav-active {
+            background: linear-gradient(90deg, rgba(237,30,121,0.25) 0%, transparent 100%);
+            border-left: 4px solid #ED1E79;
+            color: white !important;
+        }
+
+        table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table.data-table th {
+            background: linear-gradient(140deg, #3D008D 0%, #ED1E79 100%);
+            color: white;
+            padding: 12px 16px;
+            text-align: center;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        table.data-table th:first-child { border-radius: 12px 0 0 0; }
+        table.data-table th:last-child { border-radius: 0 12px 0 0; }
+        table.data-table td {
+            padding: 10px 16px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+        table.data-table tr:hover { background: #f8fafc; }
+        table.data-table td:first-child { text-align: left; font-weight: 500; }
+
+        .metric-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .metric-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
+        .metric-value { font-size: 2rem; font-weight: 800; }
+        .metric-label { font-size: 0.75rem; color: #64748b; margin-top: 4px; font-weight: 500; }
+
+        .badge-ok { background: #dcfce7; color: #166534; padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        .badge-warn { background: #fef9c3; color: #854d0e; padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        .badge-bad { background: #fecaca; color: #991b1b; padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+
+        .code-block {
+            background: #1e1e2e;
+            color: #cdd6f4;
+            border-radius: 12px;
+            padding: 1.25rem;
+            overflow-x: auto;
+            font-size: 0.82rem;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+
+<body class="m-0 p-0 overflow-hidden">
+    <div class="flex h-screen overflow-hidden bg-slate-50 font-sans" id="app-layout">
+
+        <!-- Toggle Button -->
+        <button class="fixed top-4 left-4 z-50 p-2.5 w-10 h-10 flex items-center justify-center rounded-full shadow-lg text-white transition-all hover:scale-110"
+            id="sidebar-toggle" style="background: linear-gradient(140deg, #3D008D 0%, #ED1E79 100%)" title="Mostrar/Ocultar Menú">
+            <span class="font-bold" id="sidebar-icon">&times;</span>
+        </button>
+
+        <!-- Sidebar -->
+        <aside class="flex-shrink-0 overflow-y-auto z-40 flex flex-col usta-header text-white shadow-2xl"
+            id="main-sidebar"
+            style="transition: width 0.3s ease, min-width 0.3s ease, opacity 0.25s ease; width: 16rem; min-width: 16rem; overflow-y: auto; overflow-x: hidden;">
+            <div class="p-6 pt-10 border-b border-white border-opacity-20 bg-black bg-opacity-10 backdrop-blur-sm sticky top-0 z-50">
+                <h1 class="font-extrabold text-xl tracking-tight flex items-center gap-2">
+                    <span class="text-white">VLM</span>
+                    <span class="text-secondary">Estanterías</span>
+                </h1>
+                <p class="text-xs text-blue-200 mt-2 font-medium opacity-80">Informe Técnico de Análisis</p>
+            </div>
+            <nav class="p-4 space-y-1">
+                <a class="w-full flex items-start gap-3 px-4 py-3 text-sm rounded-xl transition-all duration-300 text-left text-white/70 hover:text-white hover:bg-white/10 hover:shadow-md hover:translate-x-1 group" href="#sec-resumen">
+                    <div class="mt-0.5 w-[18px] h-[18px] shrink-0"><i class="fas fa-bullseye text-xs"></i></div>
+                    <span class="font-medium leading-tight">Resumen Ejecutivo</span>
+                </a>
+                <a class="w-full flex items-start gap-3 px-4 py-3 text-sm rounded-xl transition-all duration-300 text-left text-white/70 hover:text-white hover:bg-white/10 hover:shadow-md hover:translate-x-1 group" href="#sec-infra">
+                    <div class="mt-0.5 w-[18px] h-[18px] shrink-0"><i class="fas fa-server text-xs"></i></div>
+                    <span class="font-medium leading-tight">Infraestructura</span>
+                </a>
+                <a class="w-full flex items-start gap-3 px-4 py-3 text-sm rounded-xl transition-all duration-300 text-left text-white/70 hover:text-white hover:bg-white/10 hover:shadow-md hover:translate-x-1 group" href="#sec-dataset">
+                    <div class="mt-0.5 w-[18px] h-[18px] shrink-0"><i class="fas fa-database text-xs"></i></div>
+                    <span class="font-medium leading-tight">Dataset</span>
+                </a>
+                <a class="w-full flex items-start gap-3 px-4 py-3 text-sm rounded-xl transition-all duration-300 text-left text-white/70 hover:text-white hover:bg-white/10 hover:shadow-md hover:translate-x-1 group" href="#sec-hallazgos">
+                    <div class="mt-0.5 w-[18px] h-[18px] shrink-0"><i class="fas fa-flask text-xs"></i></div>
+                    <span class="font-medium leading-tight">Hallazgos Técnicos</span>
+                </a>
+                <a class="w-full flex items-start gap-3 px-4 py-3 text-sm rounded-xl transition-all duration-300 text-left text-white/70 hover:text-white hover:bg-white/10 hover:shadow-md hover:translate-x-1 group" href="#sec-evolucion">
+                    <div class="mt-0.5 w-[18px] h-[18px] shrink-0"><i class="fas fa-chart-line text-xs"></i></div>
+                    <span class="font-medium leading-tight">Evolución del Pipeline</span>
+                </a>
+                <a class="w-full flex items-start gap-3 px-4 py-3 text-sm rounded-xl transition-all duration-300 text-left text-white/70 hover:text-white hover:bg-white/10 hover:shadow-md hover:translate-x-1 group" href="#sec-resultados">
+                    <div class="mt-0.5 w-[18px] h-[18px] shrink-0"><i class="fas fa-trophy text-xs"></i></div>
+                    <span class="font-medium leading-tight">Resultados v4 (Final)</span>
+                </a>
+                <a class="w-full flex items-start gap-3 px-4 py-3 text-sm rounded-xl transition-all duration-300 text-left text-white/70 hover:text-white hover:bg-white/10 hover:shadow-md hover:translate-x-1 group" href="#sec-estructura">
+                    <div class="mt-0.5 w-[18px] h-[18px] shrink-0"><i class="fas fa-folder-tree text-xs"></i></div>
+                    <span class="font-medium leading-tight">Estructura del Proyecto</span>
+                </a>
+                <a class="w-full flex items-start gap-3 px-4 py-3 text-sm rounded-xl transition-all duration-300 text-left text-white/70 hover:text-white hover:bg-white/10 hover:shadow-md hover:translate-x-1 group" href="#sec-lecciones">
+                    <div class="mt-0.5 w-[18px] h-[18px] shrink-0"><i class="fas fa-lightbulb text-xs"></i></div>
+                    <span class="font-medium leading-tight">Lecciones Aprendidas</span>
+                </a>
+                <a class="w-full flex items-start gap-3 px-4 py-3 text-sm rounded-xl transition-all duration-300 text-left text-white/70 hover:text-white hover:bg-white/10 hover:shadow-md hover:translate-x-1 group" href="#sec-webapp">
+                    <div class="mt-0.5 w-[18px] h-[18px] shrink-0"><i class="fas fa-globe text-xs"></i></div>
+                    <span class="font-medium leading-tight">Aplicación Web (Flask)</span>
+                </a>
+                <a class="w-full flex items-start gap-3 px-4 py-3 text-sm rounded-xl transition-all duration-300 text-left text-white/70 hover:text-white hover:bg-white/10 hover:shadow-md hover:translate-x-1 group" href="#sec-sam3">
+                    <div class="mt-0.5 w-[18px] h-[18px] shrink-0"><i class="fas fa-microscope text-xs"></i></div>
+                    <span class="font-medium leading-tight">Pipeline SAM 3 + VLM</span>
+                </a>
+                <a class="w-full flex items-start gap-3 px-4 py-3 text-sm rounded-xl transition-all duration-300 text-left text-white/70 hover:text-white hover:bg-white/10 hover:shadow-md hover:translate-x-1 group" href="#sec-futuro">
+                    <div class="mt-0.5 w-[18px] h-[18px] shrink-0"><i class="fas fa-rocket text-xs"></i></div>
+                    <span class="font-medium leading-tight">Mejoras Futuras</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto p-6 md:p-10 lg:p-14 scroll-smooth bg-slate-50">
+            <div class="max-w-5xl mx-auto space-y-10">
+
+                <!-- ==================== RESUMEN EJECUTIVO ==================== -->
+                <article id="sec-resumen">
+                    <section class="usta-card p-6 md:p-8 mb-8">
+                        <div class="flex items-center gap-4 mb-8 border-b border-gray-200 pb-4">
+                            <div class="usta-gradient p-3 rounded-xl shadow-md text-white shrink-0">
+                                <i class="fas fa-bullseye text-lg"></i>
+                            </div>
+                            <h2 class="text-2xl md:text-3xl font-bold text-primary">Resumen Ejecutivo</h2>
+                        </div>
+                        <p class="text-gray-700 leading-relaxed mb-5">Proyecto de inventario visual automatizado que utiliza modelos de visión-lenguaje (VLM) locales, ejecutados vía <strong>Ollama</strong>, para analizar fotografías de estanterías de supermercado y extraer una lista estructurada de productos con cantidades y precios.</p>
+                        <p class="text-gray-700 leading-relaxed mb-6">Se iteró a través de <strong>4 versiones</strong> del pipeline, logrando una mejora progresiva desde <strong>0%</strong> de precisión global (v1) hasta <strong>61%</strong> (v4), con una reducción del <strong>79%</strong> en el sobre-conteo de productos.</p>
+
+                        <!-- KPI Cards -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                            <div class="metric-card border-t-4 border-primary">
+                                <div class="metric-value text-primary">61%</div>
+                                <div class="metric-label">Precisión Global v4</div>
+                            </div>
+                            <div class="metric-card border-t-4 border-secondary">
+                                <div class="metric-value text-secondary">46.8%</div>
+                                <div class="metric-label">Precisión Prom/Imagen</div>
+                            </div>
+                            <div class="metric-card border-t-4 border-green-500">
+                                <div class="metric-value text-green-600">49%</div>
+                                <div class="metric-label">Imágenes &ge; 50% Prec.</div>
+                            </div>
+                            <div class="metric-card border-t-4 border-gold">
+                                <div class="metric-value text-amber-600">-79%</div>
+                                <div class="metric-label">Reducción Sobre-conteo</div>
+                            </div>
+                        </div>
+                    </section>
+                </article>
+
+                <!-- ==================== INFRAESTRUCTURA ==================== -->
+                <article id="sec-infra">
+                    <section class="usta-card p-6 md:p-8 mb-8">
+                        <div class="flex items-center gap-4 mb-8 border-b border-gray-200 pb-4">
+                            <div class="usta-gradient p-3 rounded-xl shadow-md text-white shrink-0">
+                                <i class="fas fa-server text-lg"></i>
+                            </div>
+                            <h2 class="text-2xl md:text-3xl font-bold text-primary">Infraestructura</h2>
+                        </div>
+
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-microchip mr-2 text-secondary"></i>Stack Tecnológico</h3>
+                        <table class="data-table mb-8">
+                            <thead><tr><th>Componente</th><th>Tecnología</th></tr></thead>
+                            <tbody>
+                                <tr><td>Contenedor</td><td>Docker (OrbStack en macOS)</td></tr>
+                                <tr><td>Imagen base</td><td><code>python:3.11-slim-bookworm</code></td></tr>
+                                <tr><td>Modelo VLM</td><td><code>qwen2.5vl:7b</code> vía Ollama</td></tr>
+                                <tr><td>API</td><td>Ollama nativa (<code>/api/chat</code>)</td></tr>
+                                <tr><td>Lenguaje</td><td>Python 3.11</td></tr>
+                                <tr><td>Librerías</td><td>openai, Pillow, opencv-python-headless, openpyxl, numpy</td></tr>
+                            </tbody>
+                        </table>
+
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-network-wired mr-2 text-secondary"></i>Arquitectura</h3>
+                        <div class="code-block mb-6">
+<pre>Host (macOS + OrbStack)
+├── Ollama (puerto 11434)
+│   ├── qwen2.5vl:7b    &larr; Modelo principal (estable)
+│   └── qwen3-vl:8b     &larr; Descartado (bug thinking mode)
+│
+└── Docker: entorno-llm-dev
+    ├── /app             &larr; Scripts Python (montado desde ./app)
+    ├── /data            &larr; Resultados Excel/JSON (montado desde ./data)
+    └── /archive         &larr; Dataset de imágenes (montado desde ./archive)</pre>
+                        </div>
+
+                        <div class="tip-box rounded-xl p-5">
+                            <p class="text-sm text-gray-700"><i class="fas fa-info-circle text-primary mr-2"></i><strong>Conexión Contenedor &rarr; Ollama:</strong> Se utiliza <code>host.docker.internal:11434</code> para acceder a Ollama desde dentro del contenedor. La API nativa de Ollama (<code>/api/chat</code>) se usa en lugar de la capa OpenAI-compatible (<code>/v1/chat/completions</code>) debido a un bug identificado con <code>qwen3-vl:8b</code> (ver sección Hallazgos).</p>
+                        </div>
+                    </section>
+                </article>
+
+                <!-- ==================== DATASET ==================== -->
+                <article id="sec-dataset">
+                    <section class="usta-card p-6 md:p-8 mb-8">
+                        <div class="flex items-center gap-4 mb-8 border-b border-gray-200 pb-4">
+                            <div class="usta-gradient p-3 rounded-xl shadow-md text-white shrink-0">
+                                <i class="fas fa-database text-lg"></i>
+                            </div>
+                            <h2 class="text-2xl md:text-3xl font-bold text-primary">Dataset</h2>
+                        </div>
+
+                        <p class="text-gray-700 leading-relaxed mb-5">Carpeta <code>archive/</code> con imágenes de estanterías de supermercado y anotaciones de productos con bounding boxes y precios.</p>
+
+                        <table class="data-table mb-6">
+                            <thead><tr><th>Elemento</th><th>Detalle</th></tr></thead>
+                            <tbody>
+                                <tr><td>Imágenes</td><td>651 fotografías JPG de estanterías</td></tr>
+                                <tr><td>Anotaciones</td><td>15,064 registros en <code>annotations.csv</code></td></tr>
+                                <tr><td>Campos CSV</td><td><code>id</code>, <code>img_name</code>, <code>x1</code>, <code>y1</code>, <code>x2</code>, <code>y2</code>, <code>price</code></td></tr>
+                                <tr><td>Productos/imagen</td><td>Min: 2 &nbsp;|&nbsp; Max: 92 &nbsp;|&nbsp; Promedio: ~23 &nbsp;|&nbsp; Mediana: 23</td></tr>
+                            </tbody>
+                        </table>
+
+                        <div class="tip-box rounded-xl p-5">
+                            <p class="text-sm text-gray-700"><i class="fas fa-vial text-primary mr-2"></i><strong>Muestreo:</strong> Se trabajó con el <strong>10%</strong> del dataset (65 imágenes) seleccionado con <code>random.seed(42)</code> para reproducibilidad. La misma muestra se utilizó en todas las versiones para comparación directa.</p>
+                        </div>
+                    </section>
+                </article>
+
+                <!-- ==================== HALLAZGOS TÉCNICOS ==================== -->
+                <article id="sec-hallazgos">
+                    <section class="usta-card p-6 md:p-8 mb-8">
+                        <div class="flex items-center gap-4 mb-8 border-b border-gray-200 pb-4">
+                            <div class="usta-gradient p-3 rounded-xl shadow-md text-white shrink-0">
+                                <i class="fas fa-flask text-lg"></i>
+                            </div>
+                            <h2 class="text-2xl md:text-3xl font-bold text-primary">Hallazgos Técnicos</h2>
+                        </div>
+
+                        <!-- Hallazgo 1 -->
+                        <div class="mb-8">
+                            <h3 class="text-lg font-bold text-navy mb-3"><i class="fas fa-bug mr-2 text-red-500"></i>3.1 Bug de Thinking Mode en Qwen3-VL</h3>
+                            <p class="text-gray-700 leading-relaxed mb-3">El modelo <code>qwen3-vl:8b</code> genera tokens <code>&lt;think&gt;...&lt;/think&gt;</code> internos que la API OpenAI-compatible de Ollama filtra automáticamente. Cuando el modelo dedica toda su respuesta al "pensamiento", el contenido visible queda vacío.</p>
+                            <div class="warning-box rounded-xl p-5 mb-3">
+                                <p class="text-sm text-gray-700"><i class="fas fa-exclamation-triangle text-amber-600 mr-2"></i><strong>Comportamiento:</strong> Prompts simples funcionan intermitentemente. Prompts que piden JSON estructurado producen respuestas vacías de forma consistente. El flag <code>/no_think</code> es ignorado en prompts complejos.</p>
+                            </div>
+                            <p class="text-gray-700 leading-relaxed"><strong>Solución:</strong> Se descartó <code>qwen3-vl:8b</code> y se adoptó <code>qwen2.5vl:7b</code>, que no tiene thinking mode y produce respuestas estables. Se migró a la API nativa de Ollama.</p>
+                        </div>
+
+                        <!-- Hallazgo 2 -->
+                        <div class="mb-8">
+                            <h3 class="text-lg font-bold text-navy mb-3"><i class="fas fa-cut mr-2 text-amber-500"></i>3.2 Truncamiento de JSON</h3>
+                            <p class="text-gray-700 leading-relaxed mb-3">Con <code>num_predict=2000</code> tokens, las respuestas JSON se truncan frecuentemente cuando la estantería tiene muchos productos. En v4, el <strong>63%</strong> de las respuestas (41/65) sufrieron truncamiento.</p>
+                            <p class="text-gray-700 leading-relaxed"><strong>Mitigación:</strong> Parser con intentos de cierre automático (<code>]}</code>, <code>"]}</code>), fallback con regex para extraer productos del JSON parcial, y prompt con formato compacto (<code>"n"</code>, <code>"c"</code>, <code>"e"</code>, <code>"pr"</code>).</p>
+                        </div>
+
+                        <!-- Hallazgo 3 -->
+                        <div class="mb-8">
+                            <h3 class="text-lg font-bold text-navy mb-3"><i class="fas fa-arrow-up mr-2 text-red-500"></i>3.3 Sobre-conteo Sistemático</h3>
+                            <p class="text-gray-700 leading-relaxed mb-3">El modelo tiende a sobre-estimar cantidades, especialmente en estanterías con muchos productos repetidos (ej: 30 botellas de vodka similares).</p>
+                            <div class="tip-box rounded-xl p-5">
+                                <p class="text-sm text-gray-700"><i class="fas fa-chart-bar text-primary mr-2"></i><strong>Datos v1:</strong> 210 de 666 productos detectados tenían la cantidad máxima (15), indicando inflación masiva. En casos exitosos (prec. &ge; 80%), la cantidad promedio era 1-5. En casos fallidos (prec. &lt; 30%), todos los productos estaban al tope.</p>
+                            </div>
+                        </div>
+
+                        <!-- Hallazgo 4 -->
+                        <div>
+                            <h3 class="text-lg font-bold text-navy mb-3"><i class="fas fa-random mr-2 text-purple-500"></i>3.4 Inconsistencia Inter-llamadas</h3>
+                            <p class="text-gray-700 leading-relaxed mb-3">Al dividir una imagen en 3 zonas (v3), el modelo nombra el mismo producto de forma diferente en cada zona (ej: "Baileys Original 700ml" vs "Baileys Irish Cream" vs "Licor Baileys"), generando duplicados que la deduplicación no resuelve.</p>
+                            <p class="text-gray-700 leading-relaxed"><strong>Conclusión:</strong> Con modelos de 7B parámetros, la estrategia single-pass es superior a multi-pass.</p>
+                        </div>
+                    </section>
+                </article>
+
+                <!-- ==================== EVOLUCIÓN DEL PIPELINE ==================== -->
+                <article id="sec-evolucion">
+                    <section class="usta-card p-6 md:p-8 mb-8">
+                        <div class="flex items-center gap-4 mb-8 border-b border-gray-200 pb-4">
+                            <div class="usta-gradient p-3 rounded-xl shadow-md text-white shrink-0">
+                                <i class="fas fa-chart-line text-lg"></i>
+                            </div>
+                            <h2 class="text-2xl md:text-3xl font-bold text-primary">Evolución del Pipeline</h2>
+                        </div>
+
+                        <!-- Tabla comparativa general -->
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-table mr-2 text-secondary"></i>Comparativa General</h3>
+                        <div class="overflow-x-auto mb-10">
+                            <table class="data-table">
+                                <thead>
+                                    <tr><th>Métrica</th><th>v1</th><th>v2</th><th>v3</th><th>v4</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>Precisión global</td><td>0.0%</td><td>28.5%</td><td>13.3%</td><td><strong class="text-primary">61.0%</strong></td></tr>
+                                    <tr><td>Precisión prom/imagen</td><td>23.6%</td><td>39.6%</td><td>31.1%</td><td><strong class="text-primary">46.8%</strong></td></tr>
+                                    <tr><td>Imágenes &ge; 70% prec.</td><td>11 (17%)</td><td>18 (28%)</td><td>13 (20%)</td><td><strong class="text-primary">21 (32%)</strong></td></tr>
+                                    <tr><td>Imágenes &ge; 50% prec.</td><td>17 (26%)</td><td>28 (43%)</td><td>22 (34%)</td><td><strong class="text-primary">32 (49%)</strong></td></tr>
+                                    <tr><td>Total modelo</td><td>4,460</td><td>2,686</td><td>2,924</td><td><strong class="text-primary">2,176</strong></td></tr>
+                                    <tr><td>Sobre-conteo vs GT</td><td>+2,894</td><td>+1,120</td><td>+1,358</td><td><strong class="text-primary">+610</strong></td></tr>
+                                    <tr><td>Tiempo prom/imagen</td><td>40.4s</td><td>40.6s</td><td>52.8s</td><td>43.3s</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- v1 -->
+                        <div class="border-l-4 border-slate-400 pl-5 mb-8">
+                            <h3 class="text-lg font-bold text-navy mb-2">v1 &mdash; Baseline con Prompt Directo</h3>
+                            <p class="text-sm text-gray-600 mb-2"><strong>Estrategia:</strong> 2 pasos (describir &rarr; JSON). Cap cantidad a 15. <code>repeat_penalty=1.5</code>.</p>
+                            <p class="text-sm text-gray-700 mb-2"><strong>Problema:</strong> Sobre-conteo masivo. El modelo repetía el mismo producto decenas de veces en el JSON (ej: "Licor 35 x3" repetido 47 veces).</p>
+                            <div class="flex gap-3 mt-3">
+                                <span class="badge-bad">Prec. global: 0.0%</span>
+                                <span class="badge-bad">Sobre-conteo: +2,894</span>
+                            </div>
+                        </div>
+
+                        <!-- v2 -->
+                        <div class="border-l-4 border-blue-400 pl-5 mb-8">
+                            <h3 class="text-lg font-bold text-navy mb-2">v2 &mdash; Few-shot + Cap Reducido</h3>
+                            <p class="text-sm text-gray-600 mb-2"><strong>Cambios:</strong> Single-pass, few-shot example, cap a 8, post-corrección estadística, system prompt con rangos esperados.</p>
+                            <p class="text-sm text-gray-700 mb-2"><strong>Mejora clave:</strong> El few-shot example y el cap a 8 redujeron drásticamente el sobre-conteo.</p>
+                            <div class="flex gap-3 mt-3">
+                                <span class="badge-warn">Prec. global: 28.5%</span>
+                                <span class="badge-warn">Prom/imagen: 39.6%</span>
+                            </div>
+                        </div>
+
+                        <!-- v3 -->
+                        <div class="border-l-4 border-red-400 pl-5 mb-8">
+                            <h3 class="text-lg font-bold text-navy mb-2">v3 &mdash; Split por Zonas <span class="badge-bad">Descartado</span></h3>
+                            <p class="text-sm text-gray-600 mb-2"><strong>Hipótesis:</strong> Dividir imagen en 3 franjas horizontales y analizar cada una por separado.</p>
+                            <p class="text-sm text-gray-700 mb-2"><strong>Resultado:</strong> Empeoró respecto a v2. La inconsistencia inter-llamadas creó más duplicados de los que eliminó.</p>
+                            <div class="flex gap-3 mt-3">
+                                <span class="badge-bad">Prec. global: 13.3%</span>
+                                <span class="badge-bad">Prom/imagen: 31.1% (&darr;8.5pp)</span>
+                            </div>
+                        </div>
+
+                        <!-- v4 -->
+                        <div class="border-l-4 border-green-500 pl-5 mb-4">
+                            <h3 class="text-lg font-bold text-navy mb-2">v4 &mdash; Prompt Refinado + Postprocess Dinámico <span class="badge-ok">Mejor</span></h3>
+                            <p class="text-sm text-gray-600 mb-2"><strong>Cambios sobre v2:</strong> Ejemplo más realista (5 productos, 17 unidades), mensaje de "error común" explícito, temperatura 0.1, deduplicación fuzzy, post-corrección dinámica basada en productos únicos.</p>
+                            <p class="text-sm text-gray-700 mb-2"><strong>Mejora clave:</strong> Indicar explícitamente que "listar 50+ productos es INCORRECTO" redujo significativamente el sobre-conteo. Solo 4/65 imágenes necesitaron corrección estadística.</p>
+                            <div class="flex gap-3 mt-3">
+                                <span class="badge-ok">Prec. global: 61.0%</span>
+                                <span class="badge-ok">Prom/imagen: 46.8%</span>
+                                <span class="badge-ok">Sobre-conteo: +610 (-79% vs v1)</span>
+                            </div>
+                        </div>
+                    </section>
+                </article>
+
+                <!-- ==================== RESULTADOS v4 ==================== -->
+                <article id="sec-resultados">
+                    <section class="usta-card p-6 md:p-8 mb-8">
+                        <div class="flex items-center gap-4 mb-8 border-b border-gray-200 pb-4">
+                            <div class="usta-gradient p-3 rounded-xl shadow-md text-white shrink-0">
+                                <i class="fas fa-trophy text-lg"></i>
+                            </div>
+                            <h2 class="text-2xl md:text-3xl font-bold text-primary">Resultados Detallados v4</h2>
+                        </div>
+
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-chart-pie mr-2 text-secondary"></i>Distribución de Precisión</h3>
+                        <div class="grid grid-cols-5 gap-3 mb-8">
+                            <div class="metric-card border-t-4 border-green-500">
+                                <div class="metric-value text-green-600 text-xl">8</div>
+                                <div class="metric-label">&ge; 90% <br>(12%)</div>
+                            </div>
+                            <div class="metric-card border-t-4 border-blue-500">
+                                <div class="metric-value text-blue-600 text-xl">13</div>
+                                <div class="metric-label">70-89% <br>(20%)</div>
+                            </div>
+                            <div class="metric-card border-t-4 border-yellow-500">
+                                <div class="metric-value text-yellow-600 text-xl">11</div>
+                                <div class="metric-label">50-69% <br>(17%)</div>
+                            </div>
+                            <div class="metric-card border-t-4 border-orange-500">
+                                <div class="metric-value text-orange-600 text-xl">12</div>
+                                <div class="metric-label">30-49% <br>(18%)</div>
+                            </div>
+                            <div class="metric-card border-t-4 border-red-500">
+                                <div class="metric-value text-red-600 text-xl">21</div>
+                                <div class="metric-label">&lt; 30% <br>(32%)</div>
+                            </div>
+                        </div>
+
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-star mr-2 text-amber-500"></i>Top 10 Mejores Resultados</h3>
+                        <div class="overflow-x-auto mb-8">
+                            <table class="data-table">
+                                <thead><tr><th>Imagen</th><th>GT</th><th>Modelo</th><th>Precisión</th></tr></thead>
+                                <tbody>
+                                    <tr><td>0464.jpg</td><td>11</td><td>11</td><td><span class="badge-ok">100.0%</span></td></tr>
+                                    <tr><td>0470.jpg</td><td>20</td><td>20</td><td><span class="badge-ok">100.0%</span></td></tr>
+                                    <tr><td>0081.jpg</td><td>21</td><td>20</td><td><span class="badge-ok">95.2%</span></td></tr>
+                                    <tr><td>0650.jpg</td><td>15</td><td>14</td><td><span class="badge-ok">93.3%</span></td></tr>
+                                    <tr><td>0196.jpg</td><td>37</td><td>34</td><td><span class="badge-ok">91.9%</span></td></tr>
+                                    <tr><td>0284.jpg</td><td>41</td><td>37</td><td><span class="badge-ok">90.2%</span></td></tr>
+                                    <tr><td>0094.jpg</td><td>20</td><td>18</td><td><span class="badge-ok">90.0%</span></td></tr>
+                                    <tr><td>0549.jpg</td><td>30</td><td>27</td><td><span class="badge-ok">90.0%</span></td></tr>
+                                    <tr><td>0046.jpg</td><td>28</td><td>31</td><td><span class="badge-ok">89.3%</span></td></tr>
+                                    <tr><td>0387.jpg</td><td>37</td><td>33</td><td><span class="badge-ok">89.2%</span></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-exclamation-circle mr-2 text-red-500"></i>Casos Problemáticos</h3>
+                        <div class="overflow-x-auto">
+                            <table class="data-table">
+                                <thead><tr><th>Imagen</th><th>GT</th><th>Modelo</th><th>Diff</th><th>Causa probable</th></tr></thead>
+                                <tbody>
+                                    <tr><td>0104.jpg</td><td>2</td><td>40</td><td>+38</td><td class="text-left text-xs">GT muy bajo (2 anotaciones), el modelo ve más productos</td></tr>
+                                    <tr><td>0159.jpg</td><td>30</td><td>89</td><td>+59</td><td class="text-left text-xs">JSON truncado con regex que extrajo demasiados fragmentos</td></tr>
+                                    <tr><td>0225.jpg</td><td>32</td><td>183</td><td>+151</td><td class="text-left text-xs">JSON truncado masivo, corrección insuficiente</td></tr>
+                                    <tr><td>0032.jpg</td><td>26</td><td>53</td><td>+27</td><td class="text-left text-xs">Modelo infló cantidades en estantería densa</td></tr>
+                                    <tr><td>0220.jpg</td><td>4</td><td>30</td><td>+26</td><td class="text-left text-xs">GT muy bajo (4 anotaciones)</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </article>
+
+                <!-- ==================== ESTRUCTURA ==================== -->
+                <article id="sec-estructura">
+                    <section class="usta-card p-6 md:p-8 mb-8">
+                        <div class="flex items-center gap-4 mb-8 border-b border-gray-200 pb-4">
+                            <div class="usta-gradient p-3 rounded-xl shadow-md text-white shrink-0">
+                                <i class="fas fa-folder-tree text-lg"></i>
+                            </div>
+                            <h2 class="text-2xl md:text-3xl font-bold text-primary">Estructura del Proyecto</h2>
+                        </div>
+
+                        <div class="code-block mb-6">
+<pre>clasificador-docs/
+├── app/
+│   ├── analisis_estanteria.py    &larr; Pipeline v4 (versión final)
+│   ├── prueba_estanteria.py      &larr; Script de prueba de concepto (Fase 1)
+│   ├── main_clasificacion.py     &larr; Clasificación de documentos (proyecto previo)
+│   ├── main_clasificacion_1.py
+│   ├── main_clasificacion_Text.py
+│   ├── prueba_conexion.py
+│   └── generacion_archivos.py
+├── archive/
+│   ├── images/                   &larr; 651 imágenes de estanterías
+│   └── annotations.csv           &larr; 15,064 anotaciones (ground truth)
+├── data/
+│   └── resultados/               &larr; Excel y JSON de cada versión
+│       ├── analisis_estanterias_*.xlsx/json  (v1)
+│       ├── estanterias_v2_*.xlsx/json
+│       ├── estanterias_v3_*.xlsx/json
+│       └── estanterias_v4_*.xlsx/json
+├── Dockerfile
+├── docker-compose.yml
+└── requirements.txt</pre>
+                        </div>
+
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-terminal mr-2 text-secondary"></i>Uso</h3>
+                        <div class="code-block">
+<pre><span style="color:#89b4fa;"># Levantar el entorno</span>
+docker compose up -d
+
+<span style="color:#89b4fa;"># Ejecutar pipeline (10% por defecto)</span>
+docker exec entorno-llm-dev python /app/analisis_estanteria.py
+
+<span style="color:#89b4fa;"># Con otro porcentaje de muestra</span>
+docker exec entorno-llm-dev python /app/analisis_estanteria.py --sample 20</pre>
+                        </div>
+                    </section>
+                </article>
+
+                <!-- ==================== LECCIONES APRENDIDAS ==================== -->
+                <article id="sec-lecciones">
+                    <section class="usta-card p-6 md:p-8 mb-8">
+                        <div class="flex items-center gap-4 mb-8 border-b border-gray-200 pb-4">
+                            <div class="usta-gradient p-3 rounded-xl shadow-md text-white shrink-0">
+                                <i class="fas fa-lightbulb text-lg"></i>
+                            </div>
+                            <h2 class="text-2xl md:text-3xl font-bold text-primary">Lecciones Aprendidas</h2>
+                        </div>
+
+                        <div class="space-y-5">
+                            <div class="flex gap-4 items-start">
+                                <div class="shrink-0 w-8 h-8 rounded-full usta-gradient flex items-center justify-center text-white font-bold text-sm">1</div>
+                                <div>
+                                    <p class="text-gray-800 font-semibold mb-1">Los VLM de 7-8B tienen un techo para conteo preciso</p>
+                                    <p class="text-gray-600 text-sm">Pueden identificar tipos de productos y leer etiquetas de precios, pero el conteo exacto de unidades individuales en estanterías densas sigue siendo un desafío.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-4 items-start">
+                                <div class="shrink-0 w-8 h-8 rounded-full usta-gradient flex items-center justify-center text-white font-bold text-sm">2</div>
+                                <div>
+                                    <p class="text-gray-800 font-semibold mb-1">El few-shot prompting es la mejora más efectiva</p>
+                                    <p class="text-gray-600 text-sm">Mostrar un ejemplo concreto de respuesta correcta tuvo más impacto que cualquier técnica de post-procesamiento.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-4 items-start">
+                                <div class="shrink-0 w-8 h-8 rounded-full usta-gradient flex items-center justify-center text-white font-bold text-sm">3</div>
+                                <div>
+                                    <p class="text-gray-800 font-semibold mb-1">Indicar explícitamente los errores comunes ayuda</p>
+                                    <p class="text-gray-600 text-sm">La línea "ERROR COMUN: listar 50+ productos es INCORRECTO" en el prompt de v4 redujo significativamente el sobre-conteo.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-4 items-start">
+                                <div class="shrink-0 w-8 h-8 rounded-full usta-gradient flex items-center justify-center text-white font-bold text-sm">4</div>
+                                <div>
+                                    <p class="text-gray-800 font-semibold mb-1">Multi-pass no funciona bien con modelos pequeños</p>
+                                    <p class="text-gray-600 text-sm">La inconsistencia en cómo el modelo nombra productos entre llamadas genera más duplicados que los que resuelve.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-4 items-start">
+                                <div class="shrink-0 w-8 h-8 rounded-full usta-gradient flex items-center justify-center text-white font-bold text-sm">5</div>
+                                <div>
+                                    <p class="text-gray-800 font-semibold mb-1">Temperatura baja (0.1) mejora la consistencia del JSON</p>
+                                    <p class="text-gray-600 text-sm">Reduce la variabilidad en la estructura de respuesta y los loops repetitivos.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-4 items-start">
+                                <div class="shrink-0 w-8 h-8 rounded-full usta-gradient flex items-center justify-center text-white font-bold text-sm">6</div>
+                                <div>
+                                    <p class="text-gray-800 font-semibold mb-1">El post-procesamiento estadístico es un safety net, no una solución</p>
+                                    <p class="text-gray-600 text-sm">Solo 4 de 65 imágenes necesitaron corrección en v4, indicando que el prompt engineering fue más efectivo.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-4 items-start">
+                                <div class="shrink-0 w-8 h-8 rounded-full usta-gradient flex items-center justify-center text-white font-bold text-sm">7</div>
+                                <div>
+                                    <p class="text-gray-800 font-semibold mb-1">La API nativa de Ollama es más confiable</p>
+                                    <p class="text-gray-600 text-sm">La capa OpenAI-compatible filtra contenido de modelos con comportamientos especiales como el thinking mode de Qwen3.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </article>
+
+                <!-- ==================== APLICACIÓN WEB ==================== -->
+                <article id="sec-webapp">
+                    <section class="usta-card p-6 md:p-8 mb-8">
+                        <div class="flex items-center gap-4 mb-8 border-b border-gray-200 pb-4">
+                            <div class="usta-gradient p-3 rounded-xl shadow-md text-white shrink-0">
+                                <i class="fas fa-globe text-lg"></i>
+                            </div>
+                            <h2 class="text-2xl md:text-3xl font-bold text-primary">Aplicación Web (Flask)</h2>
+                        </div>
+
+                        <p class="text-gray-700 leading-relaxed mb-6">Se construyó una aplicación web completa que permite a cualquier usuario subir imágenes de estanterías y obtener un informe Excel sin necesidad de usar la terminal. La app reutiliza el pipeline v4 completo y se ejecuta dentro del mismo contenedor Docker.</p>
+
+                        <!-- Arquitectura -->
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-sitemap mr-2 text-secondary"></i>Arquitectura</h3>
+                        <div class="code-block mb-8">
+<pre>Usuario (Browser)  &rarr;  http://localhost:5050
+      │
+      ▼
+┌──────────────────────────────────────────┐
+│  Flask App (:5000 dentro del contenedor) │
+│  ├── GET  /                  &larr; UI        │
+│  ├── POST /analizar          &larr; Upload    │
+│  ├── GET  /estado/&lt;job_id&gt;   &larr; Progreso  │
+│  └── GET  /descargar/&lt;job_id&gt;&larr; Excel     │
+│                                          │
+│  Core reutilizado:                       │
+│  ├── analyze_shelf()                     │
+│  ├── export_to_excel()                   │
+│  └── ollama_chat()                       │
+└────────────┬─────────────────────────────┘
+             │
+             ▼
+       Ollama (host:11434)
+       qwen2.5vl:7b</pre>
+                        </div>
+
+                        <!-- Stack -->
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-layer-group mr-2 text-secondary"></i>Stack de la Webapp</h3>
+                        <table class="data-table mb-8">
+                            <thead><tr><th>Componente</th><th>Tecnología</th><th>Decisión</th></tr></thead>
+                            <tbody>
+                                <tr><td>Backend</td><td>Flask 3.1</td><td>Ligero, suficiente para el caso de uso</td></tr>
+                                <tr><td>Frontend</td><td>HTML + Tailwind CSS + JS vanilla</td><td>Sin dependencias de build (React/Vue innecesario)</td></tr>
+                                <tr><td>Background Jobs</td><td><code>threading</code></td><td>Un usuario concurrente, Celery sería over-engineering</td></tr>
+                                <tr><td>Progreso</td><td>Polling JSON cada 2s</td><td>Más simple que WebSockets, suficiente para ~40s/imagen</td></tr>
+                                <tr><td>Persistencia</td><td>Archivos JSON + Excel</td><td>Sin base de datos, los resultados van a <code>/data/resultados/</code></td></tr>
+                                <tr><td>Puerto</td><td>5050 (host) &rarr; 5000 (contenedor)</td><td>Puerto 5000 ocupado por AirPlay en macOS</td></tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Archivos -->
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-folder-open mr-2 text-secondary"></i>Archivos Creados / Modificados</h3>
+                        <table class="data-table mb-8">
+                            <thead><tr><th>Archivo</th><th>Acción</th><th>Descripción</th></tr></thead>
+                            <tbody>
+                                <tr><td><code>app/core.py</code></td><td><span class="badge-ok">Nuevo</span></td><td>Funciones reutilizables extraídas del pipeline v4</td></tr>
+                                <tr><td><code>app/webapp.py</code></td><td><span class="badge-ok">Nuevo</span></td><td>App Flask: rutas, jobs en background, API REST</td></tr>
+                                <tr><td><code>app/templates/index.html</code></td><td><span class="badge-ok">Nuevo</span></td><td>Frontend: drag &amp; drop, progreso, tabla de resultados</td></tr>
+                                <tr><td><code>requirements.txt</code></td><td><span class="badge-warn">Modificado</span></td><td>Agregado <code>flask>=3.0.0</code></td></tr>
+                                <tr><td><code>docker-compose.yml</code></td><td><span class="badge-warn">Modificado</span></td><td>Puerto 5050, comando Flask, variable <code>OLLAMA_BASE</code></td></tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Funcionalidades -->
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-check-double mr-2 text-secondary"></i>Funcionalidades</h3>
+                        <div class="grid md:grid-cols-2 gap-4 mb-8">
+                            <div class="flex gap-3 items-start p-4 rounded-xl bg-slate-50 border border-slate-200">
+                                <div class="shrink-0 w-8 h-8 rounded-lg usta-gradient flex items-center justify-center text-white"><i class="fas fa-upload text-sm"></i></div>
+                                <div>
+                                    <p class="font-semibold text-navy text-sm">Drag &amp; Drop</p>
+                                    <p class="text-xs text-gray-500">Arrastra imágenes o haz click para seleccionar. Preview en grid antes de analizar.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-3 items-start p-4 rounded-xl bg-slate-50 border border-slate-200">
+                                <div class="shrink-0 w-8 h-8 rounded-lg usta-gradient flex items-center justify-center text-white"><i class="fas fa-spinner text-sm"></i></div>
+                                <div>
+                                    <p class="font-semibold text-navy text-sm">Progreso en Tiempo Real</p>
+                                    <p class="text-xs text-gray-500">Barra de progreso, imagen actual, ETA estimado. Polling cada 2 segundos.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-3 items-start p-4 rounded-xl bg-slate-50 border border-slate-200">
+                                <div class="shrink-0 w-8 h-8 rounded-lg usta-gradient flex items-center justify-center text-white"><i class="fas fa-table text-sm"></i></div>
+                                <div>
+                                    <p class="font-semibold text-navy text-sm">Tabla de Resultados en Vivo</p>
+                                    <p class="text-xs text-gray-500">La tabla se actualiza conforme se procesan las imágenes. Click en una fila para expandir productos.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-3 items-start p-4 rounded-xl bg-slate-50 border border-slate-200">
+                                <div class="shrink-0 w-8 h-8 rounded-lg usta-gradient flex items-center justify-center text-white"><i class="fas fa-file-excel text-sm"></i></div>
+                                <div>
+                                    <p class="font-semibold text-navy text-sm">Descarga Excel</p>
+                                    <p class="text-xs text-gray-500">Informe con 3 hojas: Resumen, Detalle de Productos, Estadísticas.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- API Endpoints -->
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-plug mr-2 text-secondary"></i>API Endpoints</h3>
+                        <table class="data-table mb-8">
+                            <thead><tr><th>Método</th><th>Ruta</th><th>Descripción</th><th>Respuesta</th></tr></thead>
+                            <tbody>
+                                <tr><td><code>GET</code></td><td><code>/</code></td><td>Interfaz web principal</td><td>HTML</td></tr>
+                                <tr><td><code>POST</code></td><td><code>/analizar</code></td><td>Sube imágenes e inicia análisis</td><td><code>{"job_id":"abc","total":5}</code></td></tr>
+                                <tr><td><code>GET</code></td><td><code>/estado/&lt;job_id&gt;</code></td><td>Estado y resultados parciales del job</td><td><code>{"estado":"procesando","procesadas":3,...}</code></td></tr>
+                                <tr><td><code>GET</code></td><td><code>/descargar/&lt;job_id&gt;</code></td><td>Descarga el Excel generado</td><td>Archivo .xlsx</td></tr>
+                                <tr><td><code>GET</code></td><td><code>/thumbnail/&lt;job_id&gt;/&lt;file&gt;</code></td><td>Thumbnail de una imagen</td><td><code>{"thumbnail":"base64..."}</code></td></tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Flujo de uso -->
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-route mr-2 text-secondary"></i>Flujo de Uso</h3>
+                        <div class="flex flex-col md:flex-row gap-3 mb-8">
+                            <div class="flex-1 p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                                <div class="w-10 h-10 rounded-full usta-gradient flex items-center justify-center text-white font-bold mx-auto mb-2">1</div>
+                                <p class="font-semibold text-navy text-sm">Subir</p>
+                                <p class="text-xs text-gray-500 mt-1">Arrastra imágenes de estanterías al área de upload</p>
+                            </div>
+                            <div class="flex items-center justify-center text-slate-300 text-xl hidden md:flex">&rarr;</div>
+                            <div class="flex-1 p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                                <div class="w-10 h-10 rounded-full usta-gradient flex items-center justify-center text-white font-bold mx-auto mb-2">2</div>
+                                <p class="font-semibold text-navy text-sm">Analizar</p>
+                                <p class="text-xs text-gray-500 mt-1">Click en "Analizar" y observa el progreso en tiempo real</p>
+                            </div>
+                            <div class="flex items-center justify-center text-slate-300 text-xl hidden md:flex">&rarr;</div>
+                            <div class="flex-1 p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                                <div class="w-10 h-10 rounded-full usta-gradient flex items-center justify-center text-white font-bold mx-auto mb-2">3</div>
+                                <p class="font-semibold text-navy text-sm">Revisar</p>
+                                <p class="text-xs text-gray-500 mt-1">Explora la tabla de resultados, click para ver detalle</p>
+                            </div>
+                            <div class="flex items-center justify-center text-slate-300 text-xl hidden md:flex">&rarr;</div>
+                            <div class="flex-1 p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                                <div class="w-10 h-10 rounded-full usta-gradient flex items-center justify-center text-white font-bold mx-auto mb-2">4</div>
+                                <p class="font-semibold text-navy text-sm">Descargar</p>
+                                <p class="text-xs text-gray-500 mt-1">Descarga el informe Excel con el inventario completo</p>
+                            </div>
+                        </div>
+
+                        <!-- Decisiones de diseño -->
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-compass-drafting mr-2 text-secondary"></i>Decisiones de Diseño</h3>
+                        <div class="space-y-4 mb-6">
+                            <div class="tip-box rounded-xl p-5">
+                                <p class="text-sm text-gray-700"><i class="fas fa-puzzle-piece text-primary mr-2"></i><strong>Separación Core / Webapp:</strong> Las funciones de análisis (<code>analyze_shelf</code>, <code>export_to_excel</code>, etc.) se extrajeron a <code>core.py</code> como módulo independiente. Esto permite que tanto el CLI (<code>analisis_estanteria.py</code>) como la webapp (<code>webapp.py</code>) reutilicen exactamente la misma lógica sin duplicación.</p>
+                            </div>
+                            <div class="tip-box rounded-xl p-5">
+                                <p class="text-sm text-gray-700"><i class="fas fa-bolt text-primary mr-2"></i><strong>Threading vs Celery:</strong> Se optó por <code>threading.Thread</code> para el procesamiento en background. Flask con un solo worker puede manejar las peticiones de estado mientras el hilo de análisis trabaja. Para un entorno productivo con múltiples usuarios simultáneos se necesitaría Celery + Redis, pero para este caso de uso es innecesario.</p>
+                            </div>
+                            <div class="tip-box rounded-xl p-5">
+                                <p class="text-sm text-gray-700"><i class="fas fa-network-wired text-primary mr-2"></i><strong>Puerto 5050:</strong> macOS reserva el puerto 5000 para AirPlay Receiver (servicio AirTunes). Se mapeó <code>5050:5000</code> en docker-compose para evitar el conflicto. Dentro del contenedor Flask sigue corriendo en el 5000 estándar.</p>
+                            </div>
+                        </div>
+
+                        <!-- Acceso -->
+                        <div class="warning-box rounded-xl p-5">
+                            <p class="text-sm text-gray-700"><i class="fas fa-play-circle text-green-600 mr-2"></i><strong>Para usar la app:</strong> Ejecutar <code>docker compose up -d</code> y abrir <a href="http://localhost:5050" class="text-secondary font-bold hover:underline">http://localhost:5050</a> en el navegador.</p>
+                        </div>
+                    </section>
+                </article>
+
+                <!-- ==================== PIPELINE SAM 3 + VLM ==================== -->
+                <article id="sec-sam3">
+                    <section class="usta-card p-6 md:p-8 mb-8">
+                        <div class="flex items-center gap-4 mb-8 border-b border-gray-200 pb-4">
+                            <div class="usta-gradient p-3 rounded-xl shadow-md text-white shrink-0">
+                                <i class="fas fa-microscope text-lg"></i>
+                            </div>
+                            <h2 class="text-2xl md:text-3xl font-bold text-primary">Pipeline H&iacute;brido SAM 3 + VLM</h2>
+                        </div>
+
+                        <p class="text-gray-700 leading-relaxed mb-5">Se implement&oacute; un pipeline h&iacute;brido que combina <strong>Meta SAM 3</strong> (Segment Anything Model 3, noviembre 2025) para detecci&oacute;n y segmentaci&oacute;n de productos con <strong>qwen2.5vl:7b</strong> para identificaci&oacute;n de nombre y precio. A diferencia de las versiones v1&ndash;v4 donde el VLM hac&iacute;a todo (detectar, contar, identificar), aqu&iacute; cada modelo hace lo que mejor sabe hacer.</p>
+
+                        <!-- Arquitectura -->
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-sitemap mr-2 text-secondary"></i>Arquitectura del Pipeline</h3>
+                        <div class="code-block mb-8">
+<pre>Imagen (RGB)
+    &darr;
+SAM 3 + text prompt: "product"
+    &darr;
+    ├── mask_1 (score: 0.92, bbox)
+    ├── mask_2 (score: 0.88, bbox)
+    └── ...mask_N
+    &darr;  (filtrar: score &ge; 0.1, area &ge; 500px)
+crop_mask_region() &rarr; PIL Image por mask
+    &darr;  (ThreadPoolExecutor, max_workers)
+VLM (qwen2.5vl:7b) por cada crop:
+    &rarr; {"name": "Vodka Absolut", "price": 15.99}
+    &darr;
+deduplicate_products() &rarr; lista final &rarr; Excel</pre>
+                        </div>
+
+                        <!-- Diferencias clave -->
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-exchange-alt mr-2 text-secondary"></i>Diferencias Clave vs Pipeline v4</h3>
+                        <div class="overflow-x-auto mb-8">
+                            <table class="data-table">
+                                <thead>
+                                    <tr><th>Aspecto</th><th>Pipeline v4</th><th>Pipeline SAM 3</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>Detecci&oacute;n</td><td>VLM detecta y cuenta</td><td>SAM 3 con text prompt detecta</td></tr>
+                                    <tr><td>Conteo</td><td>VLM infla cantidades (+610)</td><td>SAM cuenta por masks</td></tr>
+                                    <tr><td>JSON</td><td>Un JSON masivo por imagen</td><td>N JSON individuales (1 por mask)</td></tr>
+                                    <tr><td>Truncamiento</td><td class="text-red-600 font-semibold">63% de respuestas</td><td class="text-green-600 font-semibold">0%</td></tr>
+                                    <tr><td>Paralelizaci&oacute;n</td><td>1 request por imagen</td><td>N requests paralelos</td></tr>
+                                    <tr><td>Segmentaci&oacute;n</td><td>Ninguna</td><td>SAM 3 open-vocabulary</td></tr>
+                                    <tr><td>GPU necesaria</td><td>No</td><td>Recomendada (CUDA)</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- SAM 3 vs SAM 2 -->
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-code-branch mr-2 text-secondary"></i>&iquest;Por qu&eacute; SAM 3 y no SAM 2.1?</h3>
+                        <div class="tip-box rounded-xl p-5 mb-8">
+                            <p class="text-sm text-gray-700 mb-3"><i class="fas fa-info-circle text-primary mr-2"></i>SAM 3 (noviembre 2025) introduce <strong>text prompts</strong> para detecci&oacute;n open-vocabulary: se le indica "product" y retorna masks solo de productos, no de estantes, separadores ni fondo. SAM 2.1 usaba segmentaci&oacute;n ciega (<code>AutomaticMaskGenerator</code>) que generaba masks de todo lo visible, requiriendo filtrado agresivo posterior.</p>
+                            <div class="overflow-x-auto">
+                                <table class="data-table">
+                                    <thead><tr><th>Aspecto</th><th>SAM 2.1</th><th>SAM 3</th></tr></thead>
+                                    <tbody>
+                                        <tr><td>Segmentaci&oacute;n</td><td>Ciega (AutomaticMaskGenerator)</td><td>Guiada por text prompt</td></tr>
+                                        <tr><td>Ruido</td><td>Masks de todo (estantes, fondo)</td><td>Solo productos detectados</td></tr>
+                                        <tr><td>Par&aacute;metros</td><td>224M (hiera_large)</td><td>848M</td></tr>
+                                        <tr><td>MPS (Apple Silicon)</td><td>Soportado</td><td>No soportado (solo CUDA/CPU)</td></tr>
+                                        <tr><td>Checkpoint</td><td>Descarga manual (856MB)</td><td>Auto-download HuggingFace (gated)</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Resultados -->
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-chart-bar mr-2 text-secondary"></i>Resultados Preliminares (5 im&aacute;genes, CPU)</h3>
+                        <div class="overflow-x-auto mb-6">
+                            <table class="data-table">
+                                <thead>
+                                    <tr><th>Imagen</th><th>Ground Truth</th><th>SAM 3 + VLM</th><th>Diff</th><th>Precisi&oacute;n</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>0114.jpg</td><td>47</td><td>43</td><td>-4</td><td><span class="badge-ok">91.5%</span></td></tr>
+                                    <tr><td>0025.jpg</td><td>17</td><td>47</td><td>+30</td><td><span class="badge-bad">36.2%</span></td></tr>
+                                    <tr><td>0281.jpg</td><td>27</td><td>55</td><td>+28</td><td><span class="badge-warn">49.1%</span></td></tr>
+                                    <tr><td>0250.jpg</td><td>15</td><td>54</td><td>+39</td><td><span class="badge-bad">27.8%</span></td></tr>
+                                    <tr><td>0142.jpg</td><td>13</td><td>39</td><td>+26</td><td><span class="badge-bad">33.3%</span></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- KPIs comparativos -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                            <div class="metric-card border-t-4 border-primary">
+                                <div class="metric-value text-primary">50.0%</div>
+                                <div class="metric-label">Precisi&oacute;n Global SAM 3</div>
+                            </div>
+                            <div class="metric-card border-t-4 border-secondary">
+                                <div class="metric-value text-secondary">47.6%</div>
+                                <div class="metric-label">Precisi&oacute;n Prom/Imagen</div>
+                            </div>
+                            <div class="metric-card border-t-4 border-green-500">
+                                <div class="metric-value text-green-600">0%</div>
+                                <div class="metric-label">Truncamiento JSON</div>
+                            </div>
+                            <div class="metric-card border-t-4 border-amber-500">
+                                <div class="metric-value text-amber-600">197s</div>
+                                <div class="metric-label">Tiempo Prom/Imagen (CPU)</div>
+                            </div>
+                        </div>
+
+                        <!-- Productos detectados -->
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-shopping-basket mr-2 text-secondary"></i>Ejemplos de Productos Detectados</h3>
+                        <div class="overflow-x-auto mb-8">
+                            <table class="data-table">
+                                <thead><tr><th>Imagen</th><th>Producto</th><th>Precio</th><th>Confianza</th></tr></thead>
+                                <tbody>
+                                    <tr><td>0114.jpg</td><td>J&amp;B Rare</td><td>$47.99</td><td>0.98</td></tr>
+                                    <tr><td>0114.jpg</td><td>Bulleit Bourbon</td><td>$29.99</td><td>0.98</td></tr>
+                                    <tr><td>0114.jpg</td><td>Glenfiddich</td><td>$59.99</td><td>0.98</td></tr>
+                                    <tr><td>0114.jpg</td><td>Jameson Irish Whiskey</td><td>$24.99</td><td>0.98</td></tr>
+                                    <tr><td>0025.jpg</td><td>Ketel One</td><td>$59.99</td><td>0.98</td></tr>
+                                    <tr><td>0025.jpg</td><td>Sobieski Vodka</td><td>$24.99</td><td>0.98</td></tr>
+                                    <tr><td>0281.jpg</td><td>Gin Tanqueray</td><td>$19.99</td><td>0.98</td></tr>
+                                    <tr><td>0281.jpg</td><td>J&auml;germeister</td><td>$12.99</td><td>0.95</td></tr>
+                                    <tr><td>0250.jpg</td><td>Bacardi Superior</td><td>$12.99</td><td>0.95</td></tr>
+                                    <tr><td>0142.jpg</td><td>Finlandia Vodka</td><td>$29.99</td><td>0.98</td></tr>
+                                    <tr><td>0142.jpg</td><td>Belvedere Vodka</td><td>$39.99</td><td>0.98</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Hallazgos técnicos SAM 3 -->
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-bug mr-2 text-secondary"></i>Hallazgos T&eacute;cnicos de la Integraci&oacute;n</h3>
+                        <div class="space-y-4 mb-8">
+                            <div class="warning-box rounded-xl p-5">
+                                <p class="text-sm text-gray-700"><i class="fas fa-exclamation-triangle text-amber-600 mr-2"></i><strong>SAM 3 no soporta CPU nativamente:</strong> El c&oacute;digo de Meta tiene 6 hardcodes de <code>device="cuda"</code> y llamadas a <code>pin_memory()</code> que fallan sin GPU. Se requieren parches (incluidos en <code>Dockerfile.sam</code>) para ejecutar en CPU.</p>
+                            </div>
+                            <div class="warning-box rounded-xl p-5">
+                                <p class="text-sm text-gray-700"><i class="fas fa-exclamation-triangle text-amber-600 mr-2"></i><strong>Dtype mismatch en CPU:</strong> SAM 3 carga pesos en bfloat16 y espera <code>torch.autocast("cuda")</code>. En CPU se necesita <code>torch.autocast("cpu", dtype=torch.bfloat16)</code> para evitar errores de tipos.</p>
+                            </div>
+                            <div class="warning-box rounded-xl p-5">
+                                <p class="text-sm text-gray-700"><i class="fas fa-exclamation-triangle text-amber-600 mr-2"></i><strong>Modelo gated:</strong> El checkpoint de SAM 3 en HuggingFace (<code>facebook/sam3</code>) requiere aceptar la licencia y un token <code>HF_TOKEN</code>. La aprobaci&oacute;n puede no ser instant&aacute;nea.</p>
+                            </div>
+                            <div class="tip-box rounded-xl p-5">
+                                <p class="text-sm text-gray-700"><i class="fas fa-info-circle text-primary mr-2"></i><strong>Dependencias no declaradas:</strong> SAM 3 requiere <code>einops</code>, <code>pycocotools</code> y <code>psutil</code> que no est&aacute;n en su <code>setup.py</code>. Se instalan por separado en el Dockerfile.</p>
+                            </div>
+                            <div class="tip-box rounded-xl p-5">
+                                <p class="text-sm text-gray-700"><i class="fas fa-info-circle text-primary mr-2"></i><strong>Threshold 0.1 vs 0.5:</strong> Con <code>confidence=0.5</code> el prompt <code>"product on supermarket shelf"</code> detecta 0 masks. Con <code>confidence=0.1</code> y prompt <code>"product"</code> detecta ~100-200 masks. Los scores en CPU son m&aacute;s bajos que en GPU.</p>
+                            </div>
+                        </div>
+
+                        <!-- Stack -->
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-layer-group mr-2 text-secondary"></i>Stack del Pipeline H&iacute;brido</h3>
+                        <table class="data-table mb-8">
+                            <thead><tr><th>Componente</th><th>Tecnolog&iacute;a</th><th>Nota</th></tr></thead>
+                            <tbody>
+                                <tr><td>Segmentaci&oacute;n</td><td>SAM 3 (Meta, 848M params)</td><td>Text prompts, open-vocabulary</td></tr>
+                                <tr><td>Identificaci&oacute;n</td><td>qwen2.5vl:7b via Ollama</td><td>Nombre + precio por producto</td></tr>
+                                <tr><td>Contenedor</td><td>Docker (python:3.12-slim)</td><td>PyTorch CPU + SAM 3</td></tr>
+                                <tr><td>Checkpoint</td><td>HuggingFace <code>facebook/sam3</code></td><td>Gated, auto-download con HF_TOKEN</td></tr>
+                                <tr><td>Paralelismo</td><td>ThreadPoolExecutor</td><td>Llamadas VLM independientes</td></tr>
+                                <tr><td>Deduplicaci&oacute;n</td><td>Nombre + precio (fuzzy)</td><td>Filtra masks superpuestos</td></tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Ejecución -->
+                        <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-terminal mr-2 text-secondary"></i>Ejecuci&oacute;n</h3>
+                        <div class="code-block">
+<pre><span style="color:#89b4fa;"># Prerrequisito: aceptar licencia en https://huggingface.co/facebook/sam3</span>
+export HF_TOKEN=hf_xxxxx
+
+<span style="color:#89b4fa;"># Construir y levantar</span>
+docker compose -f docker-compose.sam.cpu.yml up -d --build
+
+<span style="color:#89b4fa;"># Analizar una imagen</span>
+docker exec -e HF_TOKEN=$HF_TOKEN entorno-sam \
+  python /app/app/analisis_estanteria_hybrid.py \
+  --image /archive/images/0058.jpg --sam-device cpu
+
+<span style="color:#89b4fa;"># Analizar muestra del dataset</span>
+docker exec -e HF_TOKEN=$HF_TOKEN entorno-sam \
+  python /app/app/analisis_estanteria_hybrid.py \
+  --sample 1 --max-workers 1 --text-prompt "product" --confidence 0.1</pre>
+                        </div>
+                    </section>
+                </article>
+
+                <!-- ==================== MEJORAS FUTURAS ==================== -->
+                <article id="sec-futuro">
+                    <section class="usta-card p-6 md:p-8 mb-8">
+                        <div class="flex items-center gap-4 mb-8 border-b border-gray-200 pb-4">
+                            <div class="usta-gradient p-3 rounded-xl shadow-md text-white shrink-0">
+                                <i class="fas fa-rocket text-lg"></i>
+                            </div>
+                            <h2 class="text-2xl md:text-3xl font-bold text-primary">Mejoras Futuras</h2>
+                        </div>
+
+                        <div class="grid md:grid-cols-2 gap-5">
+                            <div class="p-5 rounded-xl bg-slate-50 border border-slate-200 hover:border-primary transition-colors">
+                                <h4 class="font-bold text-navy mb-2"><i class="fas fa-sliders-h mr-2 text-primary"></i>Optimizar par&aacute;metros SAM 3</h4>
+                                <p class="text-sm text-gray-600">Ajustar <code>--confidence</code> y <code>--max-masks</code> usando el ground truth completo (15,064 anotaciones) para reducir el sobre-conteo actual (+100%).</p>
+                            </div>
+                            <div class="p-5 rounded-xl bg-slate-50 border border-slate-200 hover:border-primary transition-colors">
+                                <h4 class="font-bold text-navy mb-2"><i class="fas fa-bolt mr-2 text-primary"></i>SAM 3.1 Object Multiplex</h4>
+                                <p class="text-sm text-gray-600">Versi&oacute;n de marzo 2026 con 7x m&aacute;s velocidad para multi-objeto. Ideal para estanter&iacute;as con 20+ productos.</p>
+                            </div>
+                            <div class="p-5 rounded-xl bg-slate-50 border border-slate-200 hover:border-primary transition-colors">
+                                <h4 class="font-bold text-navy mb-2"><i class="fas fa-graduation-cap mr-2 text-primary"></i>Fine-tuning de SAM 3</h4>
+                                <p class="text-sm text-gray-600">Entrenar con las 15,064 anotaciones del dataset para mejor segmentaci&oacute;n espec&iacute;fica de productos en estanter&iacute;as.</p>
+                            </div>
+                            <div class="p-5 rounded-xl bg-slate-50 border border-slate-200 hover:border-primary transition-colors">
+                                <h4 class="font-bold text-navy mb-2"><i class="fas fa-microchip mr-2 text-primary"></i>GPU NVIDIA</h4>
+                                <p class="text-sm text-gray-600">SAM 3 en GPU reducir&iacute;a el tiempo de ~200s a ~20-30s por imagen y mejorar&iacute;a los scores de confianza.</p>
+                            </div>
+                            <div class="p-5 rounded-xl bg-slate-50 border border-slate-200 hover:border-primary transition-colors">
+                                <h4 class="font-bold text-navy mb-2"><i class="fas fa-brain mr-2 text-primary"></i>VLM m&aacute;s grande</h4>
+                                <p class="text-sm text-gray-600">Modelos de 13B+ par&aacute;metros para mejor identificaci&oacute;n de productos y lectura de etiquetas de precio.</p>
+                            </div>
+                            <div class="p-5 rounded-xl bg-slate-50 border border-slate-200 hover:border-primary transition-colors">
+                                <h4 class="font-bold text-navy mb-2"><i class="fas fa-random mr-2 text-primary"></i>Ensemble de prompts</h4>
+                                <p class="text-sm text-gray-600">Combinar resultados de m&uacute;ltiples text prompts ("product", "bottle", "item on shelf") para mayor cobertura.</p>
+                            </div>
+                        </div>
+                    </section>
+                </article>
+
+                <!-- Footer -->
+                <footer class="text-center text-sm text-gray-400 py-8 border-t border-gray-200">
+                    <p>Informe generado el 26 de marzo de 2026 &mdash; Actualizado el 3 de abril de 2026 &mdash; Pipeline v4 + SAM 3 &mdash; Modelo: qwen2.5vl:7b + Meta SAM 3</p>
+                </footer>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- Sidebar toggle ---
+        const sidebar = document.getElementById('main-sidebar');
+        const toggleBtn = document.getElementById('sidebar-toggle');
+        const toggleIcon = document.getElementById('sidebar-icon');
+        let sidebarOpen = true;
+
+        toggleBtn.addEventListener('click', () => {
+            sidebarOpen = !sidebarOpen;
+            if (sidebarOpen) {
+                sidebar.style.width = '16rem';
+                sidebar.style.minWidth = '16rem';
+                sidebar.style.opacity = '1';
+                toggleIcon.textContent = '\u00D7';
+            } else {
+                sidebar.style.width = '0';
+                sidebar.style.minWidth = '0';
+                sidebar.style.opacity = '0';
+                toggleIcon.textContent = '\u2630';
+            }
+        });
+
+        // --- Section switching ---
+        const allSections = document.querySelectorAll('article[id]');
+        const allNavLinks = document.querySelectorAll('aside nav a');
+        const mainContent = document.querySelector('main.flex-1');
+
+        function showSection(targetId) {
+            // Hide all sections
+            allSections.forEach(sec => sec.classList.remove('active-section'));
+
+            // Show target
+            const target = document.getElementById(targetId);
+            if (target) {
+                target.classList.add('active-section');
+                mainContent.scrollTop = 0;
+            }
+
+            // Update nav highlights
+            allNavLinks.forEach(link => {
+                link.classList.remove('nav-active');
+                link.classList.add('text-white/70');
+            });
+            const activeLink = document.querySelector(`aside nav a[href="#${targetId}"]`);
+            if (activeLink) {
+                activeLink.classList.add('nav-active');
+                activeLink.classList.remove('text-white/70');
+            }
+        }
+
+        // Nav click handlers
+        allNavLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const id = link.getAttribute('href').replace('#', '');
+                showSection(id);
+            });
+        });
+
+        // Keyboard navigation (left/right arrows)
+        const sectionIds = Array.from(allSections).map(s => s.id);
+        document.addEventListener('keydown', (e) => {
+            const currentIdx = sectionIds.findIndex(id =>
+                document.getElementById(id).classList.contains('active-section')
+            );
+            if (e.key === 'ArrowRight' && currentIdx < sectionIds.length - 1) {
+                showSection(sectionIds[currentIdx + 1]);
+            } else if (e.key === 'ArrowLeft' && currentIdx > 0) {
+                showSection(sectionIds[currentIdx - 1]);
+            }
+        });
+
+        // Show first section on load
+        showSection(sectionIds[0]);
+    </script>
+</body>
+
+</html>

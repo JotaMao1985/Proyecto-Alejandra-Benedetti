@@ -5,8 +5,12 @@ services:
     volumes:
       - ./app:/app
       - ./data:/data
+      - ./archive:/archive
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    ports:
+      - "5050:5000"
     environment:
       - OLLAMA_HOST=http://host.docker.internal:11434/v1
-    command: tail -f /dev/null
+      - OLLAMA_BASE=http://host.docker.internal:11434
+    command: python /app/webapp.py

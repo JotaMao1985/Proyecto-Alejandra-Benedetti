@@ -1,0 +1,10 @@
+archive/images/
+models/
+venv_sam/
+data/
+.git/
+.claude/
+__pycache__/
+*.pyc
+.DS_Store
+*.html

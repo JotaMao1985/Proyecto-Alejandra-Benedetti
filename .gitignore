@@ -1,0 +1,32 @@
+# OS
+.DS_Store
+Thumbs.db
+*.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Uploads temporales
+data/uploads/
+
+# Resultados generados (se regeneran)
+data/resultados/
+
+# Dataset de imagenes (demasiado pesado para git)
+archive/images/
+
+# Modelos (checkpoints pesados, se descargan en runtime)
+models/
+
+# Virtual environments
+venv_sam/
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code
+.claude/
