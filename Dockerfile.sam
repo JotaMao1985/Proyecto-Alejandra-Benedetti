@@ -31,6 +31,14 @@ RUN find /usr/local/lib/python3.12/site-packages/sam3/model -name "*.py" \
 # 2. pin_memory() falla sin GPU — eliminarlo en geometry_encoders.py
 RUN sed -i 's/scale = scale.pin_memory().to(device=boxes_xyxy.device, non_blocking=True)/scale = scale.to(device=boxes_xyxy.device)/g' \
     /usr/local/lib/python3.12/site-packages/sam3/model/geometry_encoders.py
+# 3. Triton no existe en CPU/macOS — crear stub para que el módulo cargue
+RUN python -c "\
+f='/usr/local/lib/python3.12/site-packages/sam3/model/edt.py'; \
+c=open(f).read(); \
+old='import triton\nimport triton.language as tl'; \
+new='try:\n    import triton\n    import triton.language as tl\nexcept ImportError:\n    import types\n    triton = types.SimpleNamespace(jit=lambda fn: fn, autotune=lambda **kw: lambda fn: fn, Config=dict)\n    tl = types.SimpleNamespace(constexpr=int)'; \
+open(f,'w').write(c.replace(old,new)); \
+print('Patched edt.py: triton stub')"
 
 # Dependencias del proyecto
 COPY requirements_sam.txt .
@@ -40,4 +48,6 @@ COPY app/ /app/app/
 
 RUN mkdir -p /archive /data /models
 
-CMD ["tail", "-f", "/dev/null"]
+ENV PYTORCH_ENABLE_MPS_FALLBACK=1
+
+CMD ["python", "/app/app/webapp.py"]

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisis de Estanterias - SAM 3 + VLM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: { extend: {
+                fontFamily: { sans: ['Montserrat', 'sans-serif'] },
+                colors: { primary: '#3D008D', secondary: '#ED1E79', navy: '#001A4D' }
+            }}
+        }
+    </script>
+    <style>
+        body { font-family: 'Montserrat', sans-serif; }
+        .usta-gradient { background: linear-gradient(140deg, #3D008D 0%, #ED1E79 100%); }
+        .drop-zone.dragover { border-color: #ED1E79; background: rgba(237,30,121,0.08); }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    <!-- Header -->
+    <header class="usta-gradient text-white shadow-lg">
+        <div class="max-w-5xl mx-auto px-6 py-5 flex items-center gap-4">
+            <i class="fas fa-microscope text-2xl"></i>
+            <div>
+                <h1 class="text-xl font-bold">Analisis de Estanterias</h1>
+                <p class="text-sm text-white/70">SAM 3 + VLM (qwen2.5vl:7b)</p>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-6 py-8 space-y-6">
+
+        <!-- Upload Zone -->
+        <div id="upload-section">
+            <div id="drop-zone" class="drop-zone border-2 border-dashed border-slate-300 rounded-2xl p-10 text-center cursor-pointer hover:border-secondary transition-colors bg-white">
+                <i class="fas fa-cloud-upload-alt text-4xl text-slate-400 mb-3"></i>
+                <p class="text-slate-600 font-medium">Arrastra imagenes de estanterias aqui</p>
+                <p class="text-sm text-slate-400 mt-1">o haz click para seleccionar (JPG, PNG)</p>
+                <input type="file" id="file-input" multiple accept=".jpg,.jpeg,.png" class="hidden">
+            </div>
+
+            <!-- Preview Grid -->
+            <div id="preview-grid" class="grid grid-cols-4 md:grid-cols-6 gap-3 mt-4 hidden"></div>
+
+            <!-- Analyze Button -->
+            <div id="btn-container" class="mt-4 hidden">
+                <button id="btn-analyze" class="usta-gradient text-white px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-105">
+                    <i class="fas fa-search mr-2"></i>Analizar Estanterias
+                </button>
+                <span id="file-count" class="ml-4 text-sm text-slate-500"></span>
+            </div>
+        </div>
+
+        <!-- Progress -->
+        <div id="progress-section" class="hidden bg-white rounded-2xl p-6 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-semibold text-navy">
+                    <i class="fas fa-spinner fa-spin mr-2 text-secondary"></i>Procesando...
+                </h3>
+                <span id="progress-text" class="text-sm text-slate-500">0 / 0</span>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                <div id="progress-bar" class="usta-gradient h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between mt-2 text-xs text-slate-400">
+                <span id="current-image">Preparando...</span>
+                <span id="eta">ETA: calculando...</span>
+            </div>
+        </div>
+
+        <!-- Results Table -->
+        <div id="results-section" class="hidden">
+            <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+                    <h3 class="font-semibold text-navy"><i class="fas fa-table mr-2 text-secondary"></i>Resultados</h3>
+                    <button id="btn-download" class="hidden bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">
+                        <i class="fas fa-file-excel mr-2"></i>Descargar Excel
+                    </button>
+                </div>
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-semibold text-slate-600">Imagen</th>
+                            <th class="px-4 py-3 text-center font-semibold text-slate-600">Productos</th>
+                            <th class="px-4 py-3 text-center font-semibold text-slate-600">Masks SAM</th>
+                            <th class="px-4 py-3 text-center font-semibold text-slate-600">Tiempo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Product Detail (expandable) -->
+        <div id="detail-section" class="hidden bg-white rounded-2xl p-5 shadow-sm">
+            <h3 id="detail-title" class="font-semibold text-navy mb-3"></h3>
+            <table class="w-full text-sm">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left font-semibold text-slate-600">Producto</th>
+                        <th class="px-3 py-2 text-center font-semibold text-slate-600">Precio</th>
+                        <th class="px-3 py-2 text-center font-semibold text-slate-600">Confianza</th>
+                    </tr>
+                </thead>
+                <tbody id="detail-body"></tbody>
+            </table>
+        </div>
+    </main>
+
+    <footer class="text-center text-xs text-slate-400 py-6">
+        SAM 3 (Meta) + qwen2.5vl:7b (Ollama) &mdash; Pipeline Hibrido
+    </footer>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const previewGrid = document.getElementById('preview-grid');
+        const btnContainer = document.getElementById('btn-container');
+        const btnAnalyze = document.getElementById('btn-analyze');
+        const fileCount = document.getElementById('file-count');
+        const progressSection = document.getElementById('progress-section');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const currentImage = document.getElementById('current-image');
+        const eta = document.getElementById('eta');
+        const resultsSection = document.getElementById('results-section');
+        const resultsBody = document.getElementById('results-body');
+        const btnDownload = document.getElementById('btn-download');
+        const detailSection = document.getElementById('detail-section');
+        const detailTitle = document.getElementById('detail-title');
+        const detailBody = document.getElementById('detail-body');
+
+        let selectedFiles = [];
+        let currentJobId = null;
+
+        // Drag & Drop
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+        fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+        function handleFiles(files) {
+            selectedFiles = Array.from(files).filter(f => /\.(jpe?g|png)$/i.test(f.name));
+            if (!selectedFiles.length) return;
+
+            previewGrid.innerHTML = '';
+            previewGrid.classList.remove('hidden');
+            btnContainer.classList.remove('hidden');
+            fileCount.textContent = `${selectedFiles.length} imagen(es) seleccionada(s)`;
+
+            selectedFiles.forEach(f => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const div = document.createElement('div');
+                    div.className = 'relative aspect-square rounded-lg overflow-hidden border border-slate-200';
+                    div.innerHTML = `<img src="${e.target.result}" class="w-full h-full object-cover">
+                        <div class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 truncate">${f.name}</div>`;
+                    previewGrid.appendChild(div);
+                };
+                reader.readAsDataURL(f);
+            });
+        }
+
+        // Analyze
+        btnAnalyze.addEventListener('click', async () => {
+            if (!selectedFiles.length) return;
+
+            const formData = new FormData();
+            selectedFiles.forEach(f => formData.append('images', f));
+
+            btnAnalyze.disabled = true;
+            btnAnalyze.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Subiendo...';
+
+            try {
+                const res = await fetch('/analizar', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.error) { alert(data.error); return; }
+
+                currentJobId = data.job_id;
+                progressSection.classList.remove('hidden');
+                resultsSection.classList.remove('hidden');
+                resultsBody.innerHTML = '';
+                detailSection.classList.add('hidden');
+
+                pollStatus();
+            } catch (e) {
+                alert('Error al enviar: ' + e.message);
+            } finally {
+                btnAnalyze.disabled = false;
+                btnAnalyze.innerHTML = '<i class="fas fa-search mr-2"></i>Analizar Estanterias';
+            }
+        });
+
+        // Poll status
+        async function pollStatus() {
+            if (!currentJobId) return;
+
+            try {
+                const res = await fetch(`/estado/${currentJobId}`);
+                const data = await res.json();
+
+                const pct = data.total > 0 ? (data.procesadas / data.total * 100) : 0;
+                progressBar.style.width = pct + '%';
+                progressText.textContent = `${data.procesadas} / ${data.total}`;
+                currentImage.textContent = data.imagen_actual ? `Procesando: ${data.imagen_actual}` : '';
+                eta.textContent = data.eta ? `ETA: ${data.eta}s` : '';
+
+                // Update results table
+                resultsBody.innerHTML = '';
+                data.resultados.forEach((r, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'border-t border-slate-100 hover:bg-slate-50 cursor-pointer';
+                    tr.innerHTML = `
+                        <td class="px-4 py-3 font-medium">${r.imagen}</td>
+                        <td class="px-4 py-3 text-center">${r.productos}</td>
+                        <td class="px-4 py-3 text-center text-slate-500">${r.masks}</td>
+                        <td class="px-4 py-3 text-center text-slate-500">${r.tiempo}s</td>`;
+                    tr.addEventListener('click', () => showDetail(r));
+                    resultsBody.appendChild(tr);
+                });
+
+                if (data.estado === 'completado') {
+                    progressSection.querySelector('h3').innerHTML = '<i class="fas fa-check-circle mr-2 text-green-600"></i>Completado';
+                    currentImage.textContent = '';
+                    eta.textContent = `Total: ${data.elapsed}s`;
+                    if (data.excel_listo) {
+                        btnDownload.classList.remove('hidden');
+                        btnDownload.onclick = () => window.location.href = `/descargar/${currentJobId}`;
+                    }
+                    return;
+                }
+            } catch (e) {
+                console.error('Poll error:', e);
+            }
+
+            setTimeout(pollStatus, 2000);
+        }
+
+        // Show detail
+        function showDetail(r) {
+            detailSection.classList.remove('hidden');
+            detailTitle.innerHTML = `<i class="fas fa-shopping-basket mr-2 text-secondary"></i>${r.imagen} (${r.productos} productos)`;
+            detailBody.innerHTML = '';
+            r.detalle.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-t border-slate-100';
+                const price = p.price !== null ? `$${p.price}` : '<span class="text-slate-400">N/A</span>';
+                tr.innerHTML = `
+                    <td class="px-3 py-2">${p.name}</td>
+                    <td class="px-3 py-2 text-center">${price}</td>
+                    <td class="px-3 py-2 text-center">${p.confidence}</td>`;
+                detailBody.appendChild(tr);
+            });
+            detailSection.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>

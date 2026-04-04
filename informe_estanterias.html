@@ -668,7 +668,7 @@ docker exec entorno-llm-dev python /app/analisis_estanteria.py --sample 20</pre>
                             <h2 class="text-2xl md:text-3xl font-bold text-primary">Aplicación Web (Flask)</h2>
                         </div>
 
-                        <p class="text-gray-700 leading-relaxed mb-6">Se construyó una aplicación web completa que permite a cualquier usuario subir imágenes de estanterías y obtener un informe Excel sin necesidad de usar la terminal. La app reutiliza el pipeline v4 completo y se ejecuta dentro del mismo contenedor Docker.</p>
+                        <p class="text-gray-700 leading-relaxed mb-6">Se construy&oacute; una aplicaci&oacute;n web completa que permite a cualquier usuario subir im&aacute;genes de estanter&iacute;as y obtener un informe Excel sin necesidad de usar la terminal. La app utiliza el pipeline h&iacute;brido <strong>SAM 3 + VLM</strong> y se ejecuta dentro de un contenedor Docker con <code>Dockerfile.sam</code>.</p>
 
                         <!-- Arquitectura -->
                         <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-sitemap mr-2 text-secondary"></i>Arquitectura</h3>
@@ -676,22 +676,24 @@ docker exec entorno-llm-dev python /app/analisis_estanteria.py --sample 20</pre>
 <pre>Usuario (Browser)  &rarr;  http://localhost:5050
       │
       ▼
-┌──────────────────────────────────────────┐
-│  Flask App (:5000 dentro del contenedor) │
-│  ├── GET  /                  &larr; UI        │
-│  ├── POST /analizar          &larr; Upload    │
-│  ├── GET  /estado/&lt;job_id&gt;   &larr; Progreso  │
-│  └── GET  /descargar/&lt;job_id&gt;&larr; Excel     │
-│                                          │
-│  Core reutilizado:                       │
-│  ├── analyze_shelf()                     │
-│  ├── export_to_excel()                   │
-│  └── ollama_chat()                       │
-└────────────┬─────────────────────────────┘
-             │
-             ▼
-       Ollama (host:11434)
-       qwen2.5vl:7b</pre>
+┌───────────────────────────────────────────────┐
+│  Docker: entorno-sam (Dockerfile.sam)         │
+│  Flask App (:5000) + SAM 3 (848M params)     │
+│  ├── GET  /                     &larr; UI         │
+│  ├── POST /analizar             &larr; Upload      │
+│  ├── GET  /estado/&lt;job_id&gt;      &larr; Progreso   │
+│  └── GET  /descargar/&lt;job_id&gt;   &larr; Excel      │
+│                                               │
+│  core.py:                                     │
+│  ├── SAM 3 segmenta (text prompt: "product")  │
+│  ├── VLM identifica (nombre + precio)         │
+│  ├── analyze_shelf()                          │
+│  └── export_to_excel()                        │
+└────────────────┬──────────────────────────────┘
+                 │
+                 ▼
+           Ollama (host:11434)
+           qwen2.5vl:7b</pre>
                         </div>
 
                         <!-- Stack -->
@@ -713,11 +715,12 @@ docker exec entorno-llm-dev python /app/analisis_estanteria.py --sample 20</pre>
                         <table class="data-table mb-8">
                             <thead><tr><th>Archivo</th><th>Acción</th><th>Descripción</th></tr></thead>
                             <tbody>
-                                <tr><td><code>app/core.py</code></td><td><span class="badge-ok">Nuevo</span></td><td>Funciones reutilizables extraídas del pipeline v4</td></tr>
-                                <tr><td><code>app/webapp.py</code></td><td><span class="badge-ok">Nuevo</span></td><td>App Flask: rutas, jobs en background, API REST</td></tr>
-                                <tr><td><code>app/templates/index.html</code></td><td><span class="badge-ok">Nuevo</span></td><td>Frontend: drag &amp; drop, progreso, tabla de resultados</td></tr>
-                                <tr><td><code>requirements.txt</code></td><td><span class="badge-warn">Modificado</span></td><td>Agregado <code>flask>=3.0.0</code></td></tr>
-                                <tr><td><code>docker-compose.yml</code></td><td><span class="badge-warn">Modificado</span></td><td>Puerto 5050, comando Flask, variable <code>OLLAMA_BASE</code></td></tr>
+                                <tr><td><code>app/core.py</code></td><td><span class="badge-ok">Nuevo</span></td><td>Funciones reutilizables del pipeline SAM 3 + VLM</td></tr>
+                                <tr><td><code>app/webapp.py</code></td><td><span class="badge-ok">Nuevo</span></td><td>App Flask: rutas, jobs en background, carga SAM 3 al inicio</td></tr>
+                                <tr><td><code>app/templates/index.html</code></td><td><span class="badge-ok">Nuevo</span></td><td>Frontend: drag &amp; drop, progreso en tiempo real, detalle expandible</td></tr>
+                                <tr><td><code>Dockerfile.sam</code></td><td><span class="badge-ok">Nuevo</span></td><td>Python 3.12 + PyTorch + SAM 3 + parches CPU/MPS</td></tr>
+                                <tr><td><code>docker-compose.sam.cpu.yml</code></td><td><span class="badge-ok">Nuevo</span></td><td>Compose para CPU (macOS/Linux sin GPU)</td></tr>
+                                <tr><td><code>requirements_sam.txt</code></td><td><span class="badge-ok">Nuevo</span></td><td>Dependencias: timm, huggingface_hub, einops, flask</td></tr>
                             </tbody>
                         </table>
 
@@ -811,7 +814,7 @@ docker exec entorno-llm-dev python /app/analisis_estanteria.py --sample 20</pre>
 
                         <!-- Acceso -->
                         <div class="warning-box rounded-xl p-5">
-                            <p class="text-sm text-gray-700"><i class="fas fa-play-circle text-green-600 mr-2"></i><strong>Para usar la app:</strong> Ejecutar <code>docker compose up -d</code> y abrir <a href="http://localhost:5050" class="text-secondary font-bold hover:underline">http://localhost:5050</a> en el navegador.</p>
+                            <p class="text-sm text-gray-700"><i class="fas fa-play-circle text-green-600 mr-2"></i><strong>Para usar la app:</strong> Ejecutar <code>export HF_TOKEN=hf_xxxxx &amp;&amp; docker compose -f docker-compose.sam.cpu.yml up -d --build</code> y abrir <a href="http://localhost:5050" class="text-secondary font-bold hover:underline">http://localhost:5050</a> en el navegador.</p>
                         </div>
                     </section>
                 </article>
@@ -877,7 +880,7 @@ deduplicate_products() &rarr; lista final &rarr; Excel</pre>
                                         <tr><td>Segmentaci&oacute;n</td><td>Ciega (AutomaticMaskGenerator)</td><td>Guiada por text prompt</td></tr>
                                         <tr><td>Ruido</td><td>Masks de todo (estantes, fondo)</td><td>Solo productos detectados</td></tr>
                                         <tr><td>Par&aacute;metros</td><td>224M (hiera_large)</td><td>848M</td></tr>
-                                        <tr><td>MPS (Apple Silicon)</td><td>Soportado</td><td>No soportado (solo CUDA/CPU)</td></tr>
+                                        <tr><td>MPS (Apple Silicon)</td><td>Soportado</td><td>Soportado con parches (1.4x vs CPU)</td></tr>
                                         <tr><td>Checkpoint</td><td>Descarga manual (856MB)</td><td>Auto-download HuggingFace (gated)</td></tr>
                                     </tbody>
                                 </table>
@@ -916,8 +919,8 @@ deduplicate_products() &rarr; lista final &rarr; Excel</pre>
                                 <div class="metric-label">Truncamiento JSON</div>
                             </div>
                             <div class="metric-card border-t-4 border-amber-500">
-                                <div class="metric-value text-amber-600">197s</div>
-                                <div class="metric-label">Tiempo Prom/Imagen (CPU)</div>
+                                <div class="metric-value text-amber-600">142s</div>
+                                <div class="metric-label">Tiempo Prom/Imagen (MPS)</div>
                             </div>
                         </div>
 
@@ -946,7 +949,7 @@ deduplicate_products() &rarr; lista final &rarr; Excel</pre>
                         <h3 class="text-lg font-bold text-navy mb-4"><i class="fas fa-bug mr-2 text-secondary"></i>Hallazgos T&eacute;cnicos de la Integraci&oacute;n</h3>
                         <div class="space-y-4 mb-8">
                             <div class="warning-box rounded-xl p-5">
-                                <p class="text-sm text-gray-700"><i class="fas fa-exclamation-triangle text-amber-600 mr-2"></i><strong>SAM 3 no soporta CPU nativamente:</strong> El c&oacute;digo de Meta tiene 6 hardcodes de <code>device="cuda"</code> y llamadas a <code>pin_memory()</code> que fallan sin GPU. Se requieren parches (incluidos en <code>Dockerfile.sam</code>) para ejecutar en CPU.</p>
+                                <p class="text-sm text-gray-700"><i class="fas fa-exclamation-triangle text-amber-600 mr-2"></i><strong>SAM 3 requiere parches para CPU/MPS:</strong> El c&oacute;digo de Meta tiene 6 hardcodes de <code>device="cuda"</code>, llamadas a <code>pin_memory()</code>, y dependencia de Triton (NVIDIA-only) que fallan sin GPU CUDA. Se aplicaron parches (incluidos en <code>Dockerfile.sam</code>) para ejecutar en CPU y MPS (Apple Silicon).</p>
                             </div>
                             <div class="warning-box rounded-xl p-5">
                                 <p class="text-sm text-gray-700"><i class="fas fa-exclamation-triangle text-amber-600 mr-2"></i><strong>Dtype mismatch en CPU:</strong> SAM 3 carga pesos en bfloat16 y espera <code>torch.autocast("cuda")</code>. En CPU se necesita <code>torch.autocast("cpu", dtype=torch.bfloat16)</code> para evitar errores de tipos.</p>
@@ -959,6 +962,9 @@ deduplicate_products() &rarr; lista final &rarr; Excel</pre>
                             </div>
                             <div class="tip-box rounded-xl p-5">
                                 <p class="text-sm text-gray-700"><i class="fas fa-info-circle text-primary mr-2"></i><strong>Threshold 0.1 vs 0.5:</strong> Con <code>confidence=0.5</code> el prompt <code>"product on supermarket shelf"</code> detecta 0 masks. Con <code>confidence=0.1</code> y prompt <code>"product"</code> detecta ~100-200 masks. Los scores en CPU son m&aacute;s bajos que en GPU.</p>
+                            </div>
+                            <div class="tip-box rounded-xl p-5">
+                                <p class="text-sm text-gray-700"><i class="fas fa-apple-alt text-primary mr-2"></i><strong>MPS (Apple Silicon) funciona con parches:</strong> Se logr&oacute; ejecutar SAM 3 en MPS (M4 Pro) con <code>PYTORCH_ENABLE_MPS_FALLBACK=1</code> y autocast float16. Resultado: <strong>142s/imagen</strong> (1.4x m&aacute;s r&aacute;pido que CPU Docker). La operaci&oacute;n <code>_addmm_activation</code> a&uacute;n no tiene kernel MPS nativo y hace fallback a CPU.</p>
                             </div>
                         </div>
 
@@ -1009,9 +1015,13 @@ docker exec -e HF_TOKEN=$HF_TOKEN entorno-sam \
                         </div>
 
                         <div class="grid md:grid-cols-2 gap-5">
+                            <div class="p-5 rounded-xl bg-slate-50 border-2 border-secondary hover:border-primary transition-colors">
+                                <h4 class="font-bold text-navy mb-2"><i class="fas fa-filter mr-2 text-secondary"></i>NMS pre-VLM <span class="text-xs bg-secondary text-white px-2 py-0.5 rounded-full ml-1">Alta prioridad</span></h4>
+                                <p class="text-sm text-gray-600">Filtrar masks superpuestos (IoU &gt; 50%) antes del VLM. Atacar&iacute;a la causa ra&iacute;z del sobre-conteo (+100%) y reducir&iacute;a llamadas VLM de ~100 a ~20-40 por imagen.</p>
+                            </div>
                             <div class="p-5 rounded-xl bg-slate-50 border border-slate-200 hover:border-primary transition-colors">
                                 <h4 class="font-bold text-navy mb-2"><i class="fas fa-sliders-h mr-2 text-primary"></i>Optimizar par&aacute;metros SAM 3</h4>
-                                <p class="text-sm text-gray-600">Ajustar <code>--confidence</code> y <code>--max-masks</code> usando el ground truth completo (15,064 anotaciones) para reducir el sobre-conteo actual (+100%).</p>
+                                <p class="text-sm text-gray-600">Ajustar <code>--confidence</code> y <code>--max-masks</code> usando el ground truth completo (15,064 anotaciones) para reducir el sobre-conteo.</p>
                             </div>
                             <div class="p-5 rounded-xl bg-slate-50 border border-slate-200 hover:border-primary transition-colors">
                                 <h4 class="font-bold text-navy mb-2"><i class="fas fa-bolt mr-2 text-primary"></i>SAM 3.1 Object Multiplex</h4>
@@ -1023,7 +1033,7 @@ docker exec -e HF_TOKEN=$HF_TOKEN entorno-sam \
                             </div>
                             <div class="p-5 rounded-xl bg-slate-50 border border-slate-200 hover:border-primary transition-colors">
                                 <h4 class="font-bold text-navy mb-2"><i class="fas fa-microchip mr-2 text-primary"></i>GPU NVIDIA</h4>
-                                <p class="text-sm text-gray-600">SAM 3 en GPU reducir&iacute;a el tiempo de ~200s a ~20-30s por imagen y mejorar&iacute;a los scores de confianza.</p>
+                                <p class="text-sm text-gray-600">SAM 3 en CUDA reducir&iacute;a el tiempo de ~142s (MPS) a ~20-30s por imagen y mejorar&iacute;a los scores de confianza.</p>
                             </div>
                             <div class="p-5 rounded-xl bg-slate-50 border border-slate-200 hover:border-primary transition-colors">
                                 <h4 class="font-bold text-navy mb-2"><i class="fas fa-brain mr-2 text-primary"></i>VLM m&aacute;s grande</h4>

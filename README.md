@@ -46,11 +46,17 @@ git clone https://github.com/JotaMao1985/Proyecto-Alejandra-Benedetti.git
 cd Proyecto-Alejandra-Benedetti
 ```
 
-### 3. Levantar la aplicacion
+### 3. Levantar la aplicacion web (SAM 3 + VLM)
 
 ```bash
-docker compose up -d --build
+# Prerrequisito: aceptar licencia en https://huggingface.co/facebook/sam3
+export HF_TOKEN=hf_xxxxx
+
+# Construir y levantar
+docker compose -f docker-compose.sam.cpu.yml up -d --build
 ```
+
+> La primera ejecucion descarga el checkpoint de SAM 3 (~3.4GB) desde HuggingFace.
 
 ### 4. Abrir la aplicacion web
 
@@ -60,7 +66,7 @@ Abrir **http://localhost:5050** en el navegador.
 
 1. **Arrastra** imagenes de estanterias al area de upload (o haz click para seleccionar)
 2. **Click** en "Analizar Estanterias"
-3. **Observa** el progreso en tiempo real
+3. **Observa** el progreso en tiempo real (SAM 3 segmenta + VLM identifica cada producto)
 4. **Descarga** el informe Excel al finalizar
 
 ---
@@ -70,7 +76,7 @@ Abrir **http://localhost:5050** en el navegador.
 ```
 ├── app/
 │   ├── webapp.py                        <- App Flask (servidor web)
-│   ├── core.py                          <- Funciones del pipeline v4 (reutilizables)
+│   ├── core.py                          <- Funciones reutilizables del pipeline SAM 3 + VLM
 │   ├── analisis_estanteria.py           <- Pipeline v4 CLI (ejecucion por terminal)
 │   ├── analisis_estanteria_hybrid.py    <- Pipeline hibrido SAM 3 + VLM (CLI)
 │   ├── prueba_estanteria.py             <- Prueba de concepto inicial
@@ -100,16 +106,17 @@ Abrir **http://localhost:5050** en el navegador.
 Usuario (Browser)  -->  http://localhost:5050
       |
       v
-+------------------------------------------+
-|  Docker: entorno-llm-dev                 |
-|  Flask App (:5000)                       |
-|  |-- GET  /                  <- UI       |
-|  |-- POST /analizar          <- Upload   |
-|  |-- GET  /estado/<job_id>   <- Progreso |
-|  |-- GET  /descargar/<job_id><- Excel    |
-|  |                                       |
-|  Core: analyze_shelf() -> export_excel() |
-+------------------+-----------------------+
++---------------------------------------------+
+|  Docker: entorno-sam (Dockerfile.sam)        |
+|  Flask App (:5000) + SAM 3 (848M params)    |
+|  |-- GET  /                     <- UI       |
+|  |-- POST /analizar             <- Upload   |
+|  |-- GET  /estado/<job_id>      <- Progreso |
+|  |-- GET  /descargar/<job_id>   <- Excel    |
+|  |                                          |
+|  Core: SAM 3 segmenta -> VLM identifica     |
+|  analyze_shelf() -> export_to_excel()       |
++------------------+--------------------------+
                    |
                    v
              Ollama (host:11434)
@@ -123,13 +130,14 @@ Usuario (Browser)  -->  http://localhost:5050
 | Componente | Tecnologia |
 |---|---|
 | Contenedor | Docker (OrbStack / Docker Desktop) |
-| Imagen base | `python:3.11-slim-bookworm` |
+| Imagen base | `python:3.12-slim-bookworm` |
+| Segmentacion | SAM 3 (Meta, 848M params) via HuggingFace |
 | Modelo VLM | `qwen2.5vl:7b` via Ollama |
 | Backend | Flask 3.1 |
 | Frontend | HTML + Tailwind CSS + JavaScript vanilla |
 | Procesamiento | `threading` (background jobs) |
 | Excel | openpyxl |
-| Vision | Pillow, OpenCV |
+| Vision | Pillow, OpenCV, PyTorch |
 
 ---
 
@@ -234,7 +242,7 @@ deduplicate_products() -> lista final -> Excel
 | Precision prom/imagen | 46.8% | 47.6% |
 | Truncamiento JSON | 63% | **0%** |
 | Sobre-conteo | +610 (39%) | +119 (100%) |
-| Tiempo prom/imagen | 43.3s | 197s (CPU) |
+| Tiempo prom/imagen | 43.3s | 197s (CPU) / 142s (MPS) |
 
 ### Ventajas del pipeline hibrido
 
@@ -265,10 +273,10 @@ docker exec -e HF_TOKEN=$HF_TOKEN entorno-sam \
 
 ### Hallazgos tecnicos del pipeline SAM 3
 
-1. **SAM 3 no soporta MPS (Apple Silicon)**: solo CUDA y CPU.
-2. **SAM 3 tiene hardcodes de `device="cuda"`**: se requieren parches para CPU (incluidos en Dockerfile.sam).
-3. **Threshold 0.1 necesario en CPU**: los scores son mas bajos que en GPU por la precision bfloat16.
-4. **848M parametros en CPU**: ~60s solo para segmentacion por imagen. GPU NVIDIA recomendado.
+1. **SAM 3 requiere parches para CPU y MPS**: hardcodes de `device="cuda"`, `pin_memory()` y Triton (NVIDIA-only). Todos incluidos en Dockerfile.sam.
+2. **MPS (Apple Silicon) funciona con parches**: 142s/imagen en M4 Pro (1.4x mas rapido que CPU Docker). Requiere `PYTORCH_ENABLE_MPS_FALLBACK=1`.
+3. **Threshold 0.1 necesario**: los scores son mas bajos en CPU/MPS que en GPU NVIDIA.
+4. **848M parametros en CPU Docker**: ~197s/imagen. En MPS nativo: ~142s/imagen. GPU NVIDIA seria ~20-30s.
 5. **Modelo gated en HuggingFace**: requiere token y aprobacion de Meta.
 
 ---
@@ -316,6 +324,8 @@ docker exec -e HF_TOKEN=$HF_TOKEN entorno-sam \
 
 ## Lecciones Aprendidas
 
+### Pipeline v1-v4 (VLM solo)
+
 1. **Los VLM de 7-8B tienen un techo para conteo preciso.** Identifican tipos y leen etiquetas, pero el conteo exacto en estanterias densas sigue siendo un desafio.
 2. **El few-shot prompting es la mejora mas efectiva.** Mas impacto que cualquier tecnica de post-procesamiento.
 3. **Indicar errores comunes explicitos ayuda.** "ERROR COMUN: listar 50+ productos es INCORRECTO" redujo el sobre-conteo.
@@ -324,16 +334,34 @@ docker exec -e HF_TOKEN=$HF_TOKEN entorno-sam \
 6. **El post-procesamiento es un safety net, no una solucion.** Solo 4/65 imagenes lo necesitaron en v4.
 7. **La API nativa de Ollama es mas confiable** que la capa OpenAI-compatible para modelos con thinking mode.
 
+### Pipeline SAM 3 + VLM
+
+8. **Separar deteccion de identificacion mejora la arquitectura.** SAM detecta, VLM identifica: cada modelo hace lo que mejor sabe. Truncamiento de JSON eliminado por completo.
+9. **SAM 3 no fue disenado para CPU/MPS.** Requiere 3 tipos de parches: device hardcodes, pin_memory, y Triton stubs. Meta asume CUDA.
+10. **MPS funciona pero con limitaciones.** `PYTORCH_ENABLE_MPS_FALLBACK=1` permite ejecutar en Apple Silicon con 1.4x speedup vs CPU Docker, pero operaciones como `_addmm_activation` aun no tienen kernel MPS nativo.
+11. **El sobre-conteo se traslado al segmentador.** SAM 3 genera masks superpuestos del mismo producto. NMS (Non-Maximum Suppression) pre-VLM es la mejora pendiente mas impactante.
+12. **Text prompts cortos dan mejores scores.** "product" detecta mas que "product on supermarket shelf" con scores mas altos.
+
 ---
 
 ## Posibles Mejoras Futuras
 
-- **Optimizar parametros SAM 3**: ajustar `--confidence` y `--max-masks` por tipo de estanteria con el ground truth completo
-- **SAM 3.1 Object Multiplex**: 7x mas rapido para multi-objeto (released marzo 2026)
-- **Fine-tuning de SAM 3**: entrenar con las 15,064 anotaciones del dataset
-- **GPU NVIDIA**: SAM 3 en GPU reduciria el tiempo de ~200s a ~20-30s por imagen
-- **Modelo VLM mas grande**: 13B+ parametros para mejor identificacion de productos
-- **Ensemble de text prompts**: combinar resultados de multiples prompts ("product", "bottle", "item on shelf")
+### Alta prioridad (mayor impacto en precision)
+
+- **NMS pre-VLM**: filtrar masks superpuestos (IoU > 50%) antes del VLM. Atacaria la causa raiz del sobre-conteo (+100%) y reduciria llamadas VLM de ~100 a ~20-40 por imagen.
+- **Optimizar parametros SAM 3**: ajustar `--confidence` y `--max-masks` con el ground truth completo (15,064 anotaciones).
+
+### Media prioridad (rendimiento)
+
+- **SAM 3.1 Object Multiplex**: 7x mas rapido para multi-objeto (released marzo 2026).
+- **GPU NVIDIA**: SAM 3 en CUDA reduciria el tiempo de ~142s (MPS) a ~20-30s por imagen.
+- **Deduplicacion fuzzy mejorada**: usar difflib/Levenshtein en lugar de substring exacto.
+
+### Exploracion futura
+
+- **Fine-tuning de SAM 3**: entrenar con las 15,064 anotaciones del dataset.
+- **Ensemble de text prompts**: combinar resultados de multiples prompts ("product", "bottle", "item on shelf").
+- **Modelo VLM mas grande**: 13B+ parametros para mejor identificacion y OCR de precios.
 
 ---
 

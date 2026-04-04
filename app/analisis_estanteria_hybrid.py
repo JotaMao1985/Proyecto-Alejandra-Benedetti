@@ -81,9 +81,11 @@ class ShelfAnalysisResult:
 
 
 def get_sam_device() -> str:
-    """Detecta el device disponible: cuda > cpu. SAM 3 no soporta MPS."""
+    """Detecta el device disponible: cuda > mps > cpu."""
     if torch.cuda.is_available():
         return "cuda"
+    if torch.backends.mps.is_available():
+        return "mps"
     return "cpu"
 
 
@@ -120,6 +122,12 @@ def load_sam3_model(
         build_kwargs["bpe_path"] = bpe_path
 
     model = build_sam3_image_model(**build_kwargs)
+
+    # Asegurar que todos los pesos estén en el device correcto.
+    # build_sam3_image_model puede no mover todos los submodules.
+    if device in ("mps", "cuda"):
+        model = model.to(device)
+
     processor = Sam3Processor(model, confidence_threshold=confidence_threshold)
 
     return processor
@@ -151,9 +159,15 @@ def generate_sam3_masks(
             bbox: (x1, y1, x2, y2) en coordenadas de imagen
             score: confianza de la detección (0.0-1.0)
     """
-    # SAM 3 usa bfloat16 internamente. En CPU necesitamos autocast
-    # para evitar mismatch de dtypes entre pesos (bf16) e inputs (f32).
-    autocast_ctx = torch.autocast("cpu", dtype=torch.bfloat16) if not torch.cuda.is_available() else torch.autocast("cuda", dtype=torch.bfloat16)
+    # SAM 3 usa bfloat16 internamente con autocast.
+    # MPS: usar float16 (bfloat16 no es compatible con autocast en MPS).
+    # CPU: usar bfloat16. CUDA: usar bfloat16.
+    if torch.cuda.is_available():
+        autocast_ctx = torch.autocast("cuda", dtype=torch.bfloat16)
+    elif torch.backends.mps.is_available():
+        autocast_ctx = torch.autocast("mps", dtype=torch.float16)
+    else:
+        autocast_ctx = torch.autocast("cpu", dtype=torch.bfloat16)
     with autocast_ctx:
         state = processor.set_image(image)
         state = processor.set_text_prompt(text_prompt, state)
@@ -660,8 +674,8 @@ def main():
         "--sam-device",
         type=str,
         default=None,
-        choices=["cuda", "cpu"],
-        help="Device para SAM 3 (default: autodetectar). SAM 3 no soporta MPS.",
+        choices=["cuda", "mps", "cpu"],
+        help="Device para SAM 3 (default: autodetectar). MPS requiere parches (ver INTEGRACION_SAM.md).",
     )
     parser.add_argument(
         "--max-workers", type=int, default=10, help="Threads paralelos para VLM"

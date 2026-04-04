@@ -16,7 +16,7 @@ A diferencia de SAM 2.1 (segmentación ciega), SAM 3 acepta **text prompts** com
 | `requirements_sam.txt` | Dependencias para SAM 3 (timm, huggingface_hub, torch) |
 | `Dockerfile.sam` | Dockerfile con Python 3.12, PyTorch, SAM 3 |
 | `docker-compose.sam.yml` | Compose para Linux (CPU default, GPU NVIDIA comentada) |
-| `docker-compose.sam.cpu.yml` | Compose para macOS (CPU only, SAM 3 no soporta MPS) |
+| `docker-compose.sam.cpu.yml` | Compose para macOS (CPU en Docker; MPS disponible en host con parches) |
 | `INTEGRACION_SAM.md` | Este documento |
 
 ---
@@ -109,7 +109,7 @@ El checkpoint se descarga automáticamente desde HuggingFace (`facebook/sam3`).
 
 ### Ejecución en M4 Pro (macOS)
 
-SAM 3 **no soporta MPS**. Las opciones son:
+SAM 3 requiere parches para MPS (incluidos en el proyecto). Las opciones son:
 
 #### Opción A — Docker con CPU
 ```bash
@@ -233,7 +233,7 @@ SAM 3 se usa zero-shot con text prompts. Fine-tuning es una mejora futura.
 
 ## Limitaciones Conocidas
 
-1. **Sin soporte MPS**: SAM 3 no funciona con GPU de Apple Silicon. Solo CUDA y CPU.
+1. **MPS requiere parches y fallback**: SAM 3 funciona en Apple Silicon (M4 Pro) con parches de device, triton stub y `PYTORCH_ENABLE_MPS_FALLBACK=1`. Resultado: 142s/imagen (1.4x vs CPU Docker). La operación `_addmm_activation` aún no tiene kernel MPS nativo.
 
 2. **Modelo gated**: Requiere aceptar licencia en HuggingFace y token de acceso.
 
@@ -247,13 +247,27 @@ SAM 3 se usa zero-shot con text prompts. Fine-tuning es una mejora futura.
 
 ## Mejoras Futuras
 
-1. **SAM 3.1 Object Multiplex**: 7x más rápido para multi-objeto. Migración cuando se estabilice para imágenes estáticas.
+### Alta prioridad (mayor impacto en precisión)
 
-2. **Fine-tuning de SAM 3**: Entrenar con el dataset de 15,064 anotaciones para mejor segmentación de productos.
+1. **NMS pre-VLM (Non-Maximum Suppression)**: Filtrar masks superpuestos ANTES de enviar al VLM. Si dos masks tienen IoU > 50%, quedarse con el de mayor score. Esto atacaría la causa raíz del sobre-conteo (+100%) y reduciría llamadas VLM de ~100 a ~20-40 por imagen.
 
-3. **Ensemble de text prompts**: Probar múltiples prompts y combinar resultados.
+2. **Optimización de threshold y max_masks**: Usar el ground truth completo (15,064 anotaciones) para encontrar los valores óptimos de `--confidence` y `--max-masks` que minimicen el sobre-conteo sin perder productos.
 
-4. **YOLO + SAM 3**: YOLO para detección rápida + SAM 3 para segmentación fina.
+### Media prioridad (rendimiento y calidad)
+
+3. **SAM 3.1 Object Multiplex**: 7x más rápido para multi-objeto (released marzo 2026). Reduciría el tiempo de segmentación significativamente.
+
+4. **GPU NVIDIA**: CUDA eliminaría los parches de CPU/MPS y reduciría el tiempo de ~142s (MPS) a ~20-30s por imagen.
+
+5. **Deduplicación fuzzy mejorada**: Usar difflib/Levenshtein en lugar de substring exacto para mejor fusión de nombres similares (ej: "Baileys Original" vs "Baileys Irish Cream").
+
+### Baja prioridad (exploración futura)
+
+6. **Fine-tuning de SAM 3**: Entrenar con las 15,064 anotaciones para segmentación específica de productos.
+
+7. **Ensemble de text prompts**: Ejecutar con múltiples prompts ("product", "bottle", "item on shelf") y combinar resultados por IoU de masks.
+
+8. **Modelo VLM más grande**: 13B+ parámetros para mejor OCR de etiquetas y precios.
 
 ---
 
@@ -275,8 +289,9 @@ docker exec entorno-sam python /app/app/analisis_estanteria_hybrid.py --sample 1
 # 4. Porcentaje de respuestas truncadas
 ```
 
-Métricas esperadas del híbrido SAM 3:
-- **Precisión global**: 80%+ (vs 61% de v4)
-- **Sobre-conteo**: ~0% (vs +610 de v4)
-- **Truncamiento**: <5% (vs 63% de v4)
-- **Tiempo**: Variable según device (CPU más lento, GPU similar o mejor)
+Resultados reales del híbrido SAM 3 (5 imágenes):
+- **Precisión global**: 50.0% (vs 61% de v4) — optimizable con NMS y threshold tuning
+- **Precisión promedio/imagen**: 47.6% (vs 46.8% de v4)
+- **Sobre-conteo**: +119 productos (+100%) — causa: masks superpuestos sin filtrar
+- **Truncamiento**: 0% (vs 63% de v4) — eliminado por diseño
+- **Tiempo CPU Docker**: 197s/imagen | **MPS (M4 Pro)**: 142s/imagen

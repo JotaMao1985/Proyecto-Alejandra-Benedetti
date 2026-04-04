@@ -25,7 +25,7 @@ services:
       dockerfile: Dockerfile.sam
     container_name: entorno-sam
     ports:
-      - "5050:5050"
+      - "5050:5000"
     volumes:
       - ./app:/app/app
       - ./archive:/archive
