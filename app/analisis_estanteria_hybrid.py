@@ -723,7 +723,7 @@ def main():
         confidence_threshold=args.confidence,
     )
 
-    vlm_client = OpenAI(base_url=args.ollama_url, api_key="ollama")
+    vlm_client = OpenAI(base_url=args.ollama_url, api_key=os.getenv("VLM_API_KEY", "ollama"))
 
     if args.image:
         image_paths = [args.image]

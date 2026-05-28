@@ -72,7 +72,7 @@ OLLAMA_URL = os.getenv('OLLAMA_HOST', 'http://host.docker.internal:11434/v1')  #
 
 # Cliente OpenAI configurado para comunicarse con Ollama
 # Nota: Ollama expone una API compatible con OpenAI
-client = OpenAI(base_url=OLLAMA_URL, api_key='ollama')
+client = OpenAI(base_url=OLLAMA_URL, api_key=os.getenv("VLM_API_KEY", "ollama"))
 
 # =============================================================================
 # DEFINICIONES DE NEGOCIO - CATEGORÍAS DE CLASIFICACIÓN

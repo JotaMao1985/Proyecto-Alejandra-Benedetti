@@ -30,3 +30,8 @@ venv_sam/
 
 # Claude Code
 .claude/
+
+# Obsidian (personal workspace config)
+.obsidian/workspace.json
+.obsidian/app.json
+.obsidian/appearance.json

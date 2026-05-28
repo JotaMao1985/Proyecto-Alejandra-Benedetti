@@ -15,7 +15,7 @@ print(f"Configurando cliente apuntando a: {ollama_url}")
 # pero apuntando a al servidor local Ollama
 client = OpenAI(
     base_url=ollama_url,
-    api_key='ollama', # Requerido por la librería, pero ignorado por Ollama
+    api_key=os.getenv("VLM_API_KEY", "ollama"), # Requerido por la librería, pero ignorado por Ollama
 )
 
 try:

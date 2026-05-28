@@ -19,7 +19,7 @@ MODEL_NAME = "llama3.2-vision"
 DPI = 150  # 150 DPI es el sweet spot para OCR/Visión sin generar payloads gigantes
 OLLAMA_URL = os.getenv('OLLAMA_HOST', 'http://host.docker.internal:11434/v1')
 
-client = OpenAI(base_url=OLLAMA_URL, api_key='ollama')
+client = OpenAI(base_url=OLLAMA_URL, api_key=os.getenv("VLM_API_KEY", "ollama"))
 
 # --- DEFINICIONES DE NEGOCIO ---
 # Se definen aquí para fácil mantenimiento. Serán inyectadas dinámicamente en el prompt.
