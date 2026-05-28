@@ -5,14 +5,17 @@ Permite subir imágenes de estanterías, analizar con el pipeline híbrido
 SAM 3 + VLM, y descargar un informe Excel con los resultados.
 """
 
+import io
 import os
+import re
 import uuid
 import time
 import threading
 from pathlib import Path
-from dataclasses import asdict
 
-from flask import Flask, request, jsonify, render_template, send_file
+from flask import Flask, request, jsonify, render_template, send_file, abort
+from werkzeug.utils import secure_filename
+from PIL import Image, UnidentifiedImageError
 from openai import OpenAI
 
 from core import (
@@ -23,10 +26,19 @@ from core import (
 app = Flask(__name__)
 
 # Configuración
-UPLOAD_DIR = Path("/data/uploads")
-RESULTS_DIR = Path("/data/resultados/webapp")
+APP_DATA_DIR = Path(os.environ.get("APP_DATA_DIR", "/data"))
+UPLOAD_DIR = APP_DATA_DIR / "uploads"
+RESULTS_DIR = APP_DATA_DIR / "resultados" / "webapp"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+UPLOAD_DIR_RESOLVED = UPLOAD_DIR.resolve()
+
+# Límite de tamaño del request completo (suma de archivos en /analizar).
+# 50 MB permite ~25 imágenes de 2 MB; el servidor responde 413 si se excede.
+app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_UPLOAD_MB", "50")) * 1024 * 1024
+
+ALLOWED_EXTS = (".jpg", ".jpeg", ".png")
+JOB_ID_RE = re.compile(r"^[0-9a-f]{8}$")
 
 # Estado global de jobs
 jobs = {}
@@ -72,10 +84,20 @@ def analizar():
 
     image_paths = []
     for f in files:
-        if f.filename and f.filename.lower().endswith((".jpg", ".jpeg", ".png")):
-            path = job_dir / f.filename
-            f.save(str(path))
-            image_paths.append(str(path))
+        if not f.filename:
+            continue
+        safe_name = secure_filename(f.filename)
+        if not safe_name or not safe_name.lower().endswith(ALLOWED_EXTS):
+            continue
+        path = job_dir / safe_name
+        f.save(str(path))
+        try:
+            with Image.open(str(path)) as img:
+                img.verify()
+        except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+            path.unlink(missing_ok=True)
+            continue
+        image_paths.append(str(path))
 
     if not image_paths:
         return jsonify({"error": "No se enviaron imágenes válidas (jpg/png)"}), 400
@@ -143,21 +165,46 @@ def descargar(job_id):
 
 @app.route("/thumbnail/<job_id>/<filename>")
 def thumbnail(job_id, filename):
-    """Retorna un thumbnail base64 de una imagen del job."""
-    path = UPLOAD_DIR / job_id / filename
-    if not path.exists():
-        return jsonify({"error": "Imagen no encontrada"}), 404
+    """Devuelve una miniatura JPEG de una imagen del job.
 
-    from PIL import Image
-    import base64, io
+    Defensa contra path traversal: job_id se valida por regex,
+    filename se sanitiza con secure_filename, y la ruta resuelta
+    se compara contra UPLOAD_DIR_RESOLVED para descartar enlaces
+    o componentes `..` que escapen del directorio de uploads.
+    """
+    if not JOB_ID_RE.match(job_id):
+        abort(404)
 
-    img = Image.open(str(path))
-    img.thumbnail((200, 200))
-    buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=70)
-    b64 = base64.b64encode(buf.getvalue()).decode()
+    safe_name = secure_filename(filename)
+    if not safe_name or not safe_name.lower().endswith(ALLOWED_EXTS):
+        abort(404)
 
-    return jsonify({"thumbnail": f"data:image/jpeg;base64,{b64}"})
+    try:
+        path = (UPLOAD_DIR / job_id / safe_name).resolve(strict=True)
+    except (FileNotFoundError, OSError):
+        abort(404)
+
+    try:
+        path.relative_to(UPLOAD_DIR_RESOLVED)
+    except ValueError:
+        abort(404)
+
+    try:
+        with Image.open(str(path)) as img:
+            img.thumbnail((200, 200))
+            buf = io.BytesIO()
+            img.convert("RGB").save(buf, format="JPEG", quality=70)
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+        abort(404)
+
+    buf.seek(0)
+    return send_file(buf, mimetype="image/jpeg")
+
+
+@app.errorhandler(413)
+def too_large(_e):
+    limit_mb = app.config["MAX_CONTENT_LENGTH"] // (1024 * 1024)
+    return jsonify({"error": f"Petición demasiado grande (límite {limit_mb} MB)"}), 413
 
 
 # =============================================================================
@@ -217,4 +264,5 @@ def _run_analysis(job_id, image_paths):
 # =============================================================================
 if __name__ == "__main__":
     init_models()
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    port = int(os.environ.get("FLASK_PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
