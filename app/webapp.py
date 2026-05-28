@@ -233,7 +233,7 @@ def _run_analysis(job_id, image_paths):
             sam_processor,
             vlm_client,
             text_prompt=SAM3_TEXT_PROMPT,
-            max_workers=1,
+            max_workers=int(os.environ.get("VLM_MAX_WORKERS", "10")),
             min_mask_area=500,
             vlm_model=VLM_MODEL,
             progress_callback=progress_cb,

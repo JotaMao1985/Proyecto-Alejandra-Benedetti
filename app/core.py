@@ -26,7 +26,10 @@ from openai import OpenAI
 SAM3_CONFIDENCE = 0.1
 SAM3_TEXT_PROMPT = "product"
 
-OLLAMA_URL = os.environ.get("OLLAMA_HOST", "http://host.docker.internal:11434/v1")
+OLLAMA_URL = os.environ.get(
+    "OLLAMA_HOST",
+    "http://host.docker.internal:11434/v1" if os.path.exists("/.dockerenv") else "http://localhost:11434/v1",
+)
 VLM_MODEL = "qwen2.5vl:7b"
 
 
@@ -90,13 +93,59 @@ def load_sam3_model(device=None, bpe_path=None, confidence_threshold=SAM3_CONFID
     if device in ("mps", "cuda"):
         model = model.to(device)
 
-    processor = Sam3Processor(model, confidence_threshold=confidence_threshold)
+    # Pasar device explícito al Processor: su default es "cuda"/"cpu" (nunca
+    # "mps"). Sin esto, model queda en MPS y el processor envía tensores en
+    # CPU -> conv2d falla con device mismatch en Apple Silicon.
+    processor = Sam3Processor(
+        model,
+        device=device,
+        confidence_threshold=confidence_threshold,
+    )
     return processor
 
 
+def _mask_iou(m1, m2):
+    """IoU entre dos máscaras booleanas."""
+    inter = np.logical_and(m1, m2).sum()
+    if inter == 0:
+        return 0.0
+    union = np.logical_or(m1, m2).sum()
+    return inter / union if union > 0 else 0.0
+
+
+def apply_mask_nms(masks_with_data, iou_threshold=0.5):
+    """NMS sobre máscaras: descarta solapamientos de IoU > umbral.
+
+    Reduce el sobre-conteo histórico del pipeline (+100% en v5 sin NMS):
+    SAM 3 genera múltiples máscaras del mismo producto y antes cada una
+    disparaba una llamada VLM redundante.
+
+    Args:
+        masks_with_data: lista de (mask_np, bbox, score).
+        iou_threshold: dos máscaras con IoU > umbral son consideradas el mismo
+            objeto; se conserva la de mayor score.
+
+    Returns:
+        Subconjunto de masks_with_data sin solapamientos.
+    """
+    if not masks_with_data:
+        return []
+    sorted_md = sorted(masks_with_data, key=lambda x: -x[2])  # score desc
+    kept = []
+    for mask, bbox, score in sorted_md:
+        if any(_mask_iou(mask, km) > iou_threshold for km, _, _ in kept):
+            continue
+        kept.append((mask, bbox, score))
+    return kept
+
+
 def generate_sam3_masks(processor, image, text_prompt=SAM3_TEXT_PROMPT,
-                        min_area=500, max_masks=100):
-    """Genera máscaras de productos usando SAM 3 con text prompt."""
+                        min_area=500, max_masks=100, nms_iou=0.5):
+    """Genera máscaras de productos usando SAM 3 con text prompt.
+
+    Args:
+        nms_iou: umbral de IoU para NMS post-segmentación. None desactiva NMS.
+    """
     if torch.cuda.is_available():
         autocast_ctx = torch.autocast("cuda", dtype=torch.bfloat16)
     elif torch.backends.mps.is_available():
@@ -126,10 +175,10 @@ def generate_sam3_masks(processor, image, text_prompt=SAM3_TEXT_PROMPT,
         x1, y1, x2, y2 = [int(v) for v in box[:4]]
         filtered.append((mask_np, (x1, y1, x2, y2), score_val))
 
-        if len(filtered) >= max_masks:
-            break
+    if nms_iou is not None:
+        filtered = apply_mask_nms(filtered, iou_threshold=nms_iou)
 
-    return filtered
+    return filtered[:max_masks]
 
 
 def crop_mask_region(image, mask, bbox, margin=10):
@@ -237,7 +286,7 @@ def classify_single_product(image, client, model=VLM_MODEL, temperature=0.1):
 # Pipeline
 # =============================================================================
 def analyze_shelf(image_path, sam_processor, vlm_client, text_prompt=SAM3_TEXT_PROMPT,
-                  max_workers=1, min_mask_area=500, vlm_model=VLM_MODEL,
+                  max_workers=10, min_mask_area=500, vlm_model=VLM_MODEL,
                   progress_callback=None):
     """
     Pipeline híbrido SAM 3 + VLM para una imagen.
@@ -257,10 +306,13 @@ def analyze_shelf(image_path, sam_processor, vlm_client, text_prompt=SAM3_TEXT_P
         result.errors = errors
         return result
 
+    t_sam_start = time.time()
     masks_with_data = generate_sam3_masks(
         sam_processor, image, text_prompt=text_prompt,
         min_area=min_mask_area, max_masks=100,
     )
+    t_sam = time.time() - t_sam_start
+    print(f"  [TIMING] SAM 3 segmentation: {t_sam:.1f}s -> {len(masks_with_data)} masks (post-NMS)")
     result.sam_masks_generated = len(masks_with_data)
 
     if not masks_with_data:
@@ -283,6 +335,7 @@ def analyze_shelf(image_path, sam_processor, vlm_client, text_prompt=SAM3_TEXT_P
     vlm_results = []
     vlm_calls = 0
 
+    t_vlm_start = time.time()
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
             executor.submit(process_single_mask, (i, md)): i
@@ -298,6 +351,8 @@ def analyze_shelf(image_path, sam_processor, vlm_client, text_prompt=SAM3_TEXT_P
                 errors.append(f"Error en mask {futures[future]}: {e}")
             if progress_callback:
                 progress_callback(vlm_calls, len(masks_with_data))
+    t_vlm = time.time() - t_vlm_start
+    print(f"  [TIMING] VLM ({max_workers}w x {len(masks_with_data)} masks): {t_vlm:.1f}s ({t_vlm/max(len(masks_with_data),1):.2f}s/mask)")
 
     result.products = vlm_results
     result.total_products = len(vlm_results)
