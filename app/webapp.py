@@ -43,7 +43,11 @@ def init_models():
     device = os.environ.get("SAM_DEVICE", None)
     print("[INFO] Inicializando modelos...")
     sam_processor = load_sam3_model(device=device, confidence_threshold=0.1)
-    vlm_client = OpenAI(base_url=OLLAMA_URL, api_key=os.getenv("VLM_API_KEY", "ollama"))
+    vlm_client = OpenAI(
+        base_url=OLLAMA_URL,
+        api_key=os.getenv("VLM_API_KEY", "ollama"),
+        timeout=float(os.getenv("OLLAMA_TIMEOUT", "30")),
+    )
     print("[OK] Modelos listos")
 
 
