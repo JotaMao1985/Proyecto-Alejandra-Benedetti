@@ -1,30 +1,41 @@
 # requirements_sam.txt — Dependencias para pipeline híbrido SAM 3 + VLM
 # Uso: pip install -r requirements_sam.txt
+#
+# Pinned for reproducibility (Fase B).
+# Para hardware específico (CUDA / Apple Silicon MPS) instala PyTorch
+# ANTES con el --index-url correspondiente (ver bloque al final).
 
 # Core
-openai>=1.0.0
-pypdf>=3.0.0
-PyMuPDF>=1.23.0
-Pillow>=10.0.0
-opencv-python-headless>=4.8.0
+openai>=1.0,<2
+pypdf>=3.0,<7
+PyMuPDF>=1.23,<2
+Pillow>=10,<13
+opencv-python-headless>=4.8,<5
 numpy>=1.26,<2
-deskew
-dateparser
-openpyxl>=3.1.0
-flask>=3.0.0
+deskew>=1.5,<2
+dateparser>=1.2,<2
+openpyxl>=3.1,<4
+flask>=3.0,<4
 
-# SAM 3 dependencies
-timm>=1.0.17
-huggingface_hub
+# SAM 3 (PyTorch backbone + utilidades)
+# Si ya instalaste torch con --index-url, pip detecta la versión existente
+# y no la reinstala mientras esté dentro del rango.
+torch>=2.4,<3
+torchvision>=0.19,<1
+timm>=1.0.17,<2
+huggingface_hub>=0.24,<1
+einops>=0.7,<1
+pycocotools>=2.0,<3
+psutil>=5.9,<8
 
-# PyTorch (instalar según tu hardware ANTES de este requirements):
-# Linux GPU (CUDA 12.6+): pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
-# macOS CPU (Apple Silicon): pip install torch torchvision
-# CPU only: pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-
-# SAM 3 (desde el repo de Meta):
-# git clone https://github.com/facebookresearch/sam3.git && cd sam3 && pip install -e .
+# Instalación de PyTorch por hardware (corre ANTES de este requirements):
+#   Linux GPU (CUDA 12.6+): pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+#   macOS / Apple Silicon:  pip install torch torchvision
+#   CPU only:               pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 #
-# NOTA: El modelo es gated en HuggingFace. Requiere:
+# SAM 3 (no está en PyPI; clonar desde Meta):
+#   git clone https://github.com/facebookresearch/sam3.git && cd sam3 && pip install -e .
+#
+# El modelo es gated en HuggingFace:
 #   1. Aceptar la licencia en https://huggingface.co/facebook/sam3
 #   2. Autenticarse: hf auth login (o exportar HF_TOKEN)
